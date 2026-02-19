@@ -1,0 +1,11 @@
+pymupdf==1.23.8
+iocextract==1.16.1
+mitreattack-python==3.0.3
+chromadb==0.4.22
+langchain==0.1.0
+langchain-community==0.0.13
+sentence-transformers==2.3.1
+ollama==0.1.6
+pyyaml==6.0.1
+pydantic==2.5.3
+reportlab==4.0.7
