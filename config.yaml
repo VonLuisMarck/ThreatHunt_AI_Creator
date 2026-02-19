@@ -1,0 +1,9 @@
+llm:
+  model: llama3           # Ollama model name
+  temperature: 0.1
+
+output:
+  playbook_dir: playbooks
+
+demo:
+  platform: windows       # Default emulation platform: windows | linux
