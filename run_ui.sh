@@ -33,12 +33,4 @@ echo "  Opening browser at http://localhost:$PORT"
 echo "  Press Ctrl+C to stop"
 echo ""
 
-streamlit run app.py \
-    --server.port "$PORT" \
-    --server.headless false \
-    --browser.gatherUsageStats false \
-    --theme.base dark \
-    --theme.primaryColor "#CC0000" \
-    --theme.backgroundColor "#0e0e0e" \
-    --theme.secondaryBackgroundColor "#1a1a1a" \
-    --theme.textColor "#eeeeee"
+streamlit run app.py --server.port "$PORT"
