@@ -13,3 +13,4 @@ fitz
 frontend
 tools
 iocextract
+langchain_community
