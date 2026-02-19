@@ -9,3 +9,4 @@ ollama==0.1.6
 pyyaml==6.0.1
 pydantic==2.5.3
 reportlab==4.0.7
+fitz
