@@ -1,0 +1,125 @@
+You are a cybersecurity automation engineer creating attack simulation playbooks for demonstration purposes.
+
+CONTEXT:
+Based on the threat analysis, you need to create a detailed, executable attack sequence that can be safely demonstrated in a lab environment to showcase CrowdStrike's detection capabilities.
+
+THREAT ANALYSIS:
+{analysis}
+
+AVAILABLE MITRE ATT&CK TECHNIQUES:
+{ttps}
+
+EXTRACTED IOCs (for reference):
+{iocs}
+
+TASK:
+Create a logical, chronological attack sequence that:
+1. Follows the real-world attack chain from the report
+2. Can be safely executed in a lab environment
+3. Demonstrates CrowdStrike detection capabilities
+4. Uses simulation techniques (not real malware)
+5. Progresses through multiple attack stages
+
+ATTACK SEQUENCE REQUIREMENTS:
+
+For each stage in the attack chain, provide:
+
+1. STAGE IDENTIFICATION:
+   - Unique stage name (snake_case, e.g., "initial_access", "credential_theft")
+   - MITRE ATT&CK technique ID (e.g., "T1566.001")
+   - MITRE ATT&CK tactic (e.g., "Initial Access", "Credential Access")
+
+2. EXECUTION DETAILS:
+   - Required platform (windows/linux/cloud)
+   - Execution method (powershell/python/bash/api)
+   - Brief description of what happens in this stage
+
+3. DETECTION OPPORTUNITIES:
+   - What telemetry this generates
+   - What CrowdStrike would detect
+   - Expected detection severity (low/medium/high/critical)
+
+4. DEPENDENCIES:
+   - Prerequisites from previous stages
+   - Required credentials or access
+   - Environmental requirements
+
+ATTACK CHAIN STRUCTURE:
+The attack should follow this general flow (adapt based on the specific threat):
+
+1. Initial Access (T1566, T1190, T1133, etc.)
+2. Execution (T1059, T1204, etc.)
+3. Persistence (T1547, T1053, etc.) - optional
+4. Privilege Escalation (T1068, T1078, etc.) - if applicable
+5. Defense Evasion (T1562, T1070, etc.) - if applicable
+6. Credential Access (T1003, T1555, etc.) - if applicable
+7. Discovery (T1083, T1018, etc.)
+8. Lateral Movement (T1021, T1570, etc.) - if multi-system
+9. Collection (T1005, T1039, etc.) - optional
+10. Exfiltration (T1041, T1567, etc.) - optional
+11. Impact (T1486, T1490, etc.) - optional for demos
+
+RESPONSE FORMAT:
+Respond with valid JSON only, no additional text:
+
+[
+  {
+    "stage": "initial_access",
+    "stage_number": 1,
+    "technique_id": "T1566.001",
+    "tactic": "Initial Access",
+    "platform": "windows",
+    "execution_method": "powershell",
+    "description": "Simulated phishing email with malicious attachment",
+    "technical_details": "User opens document, macro executes PowerShell",
+    "simulation_approach": "Safe simulation without actual malware",
+    "telemetry_generated": [
+      "Process creation: WINWORD.EXE -> powershell.exe",
+      "Network connection to C2 domain",
+      "File write to temp directory"
+    ],
+    "crowdstrike_detections": [
+      "Suspicious Office macro execution",
+      "PowerShell spawned from Office application",
+      "Connection to known malicious domain"
+    ],
+    "detection_severity": "high",
+    "prerequisites": [],
+    "outputs": ["initial_foothold", "c2_connection"]
+  },
+  {
+    "stage": "credential_access",
+    "stage_number": 2,
+    "technique_id": "T1003.001",
+    "tactic": "Credential Access",
+    "platform": "windows",
+    "execution_method": "powershell",
+    "description": "LSASS memory dumping simulation",
+    "technical_details": "Attempt to access LSASS process memory",
+    "simulation_approach": "Use safe API calls that trigger detection without actual dumping",
+    "telemetry_generated": [
+      "Process access to lsass.exe",
+      "Suspicious API calls (MiniDumpWriteDump)",
+      "File creation in suspicious location"
+    ],
+    "crowdstrike_detections": [
+      "LSASS memory access attempt",
+      "Credential dumping behavior",
+      "Suspicious process injection"
+    ],
+    "detection_severity": "critical",
+    "prerequisites": ["initial_foothold"],
+    "outputs": ["stolen_credentials"]
+  }
+]
+
+IMPORTANT GUIDELINES:
+- Each stage must be safely executable without real malware
+- Focus on techniques that generate clear telemetry
+- Ensure logical progression between stages
+- Include realistic timing and dependencies
+- Prioritize techniques with strong CrowdStrike detection
+- Consider multi-platform attacks if relevant
+- Include cleanup considerations
+
+Respond with JSON array only:
