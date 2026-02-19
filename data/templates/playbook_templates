@@ -1,0 +1,113 @@
+{
+  "simple_ransomware": {
+    "name": "Simple Ransomware Attack Chain",
+    "description": "Basic ransomware attack: phishing → execution → credential theft → encryption",
+    "platforms": ["windows"],
+    "stages": [
+      {
+        "stage": "initial_access",
+        "technique": "T1566.001",
+        "platform": "windows"
+      },
+      {
+        "stage": "execution",
+        "technique": "T1059.001",
+        "platform": "windows"
+      },
+      {
+        "stage": "credential_access",
+        "technique": "T1003.001",
+        "platform": "windows"
+      },
+      {
+        "stage": "impact",
+        "technique": "T1486",
+        "platform": "windows"
+      }
+    ]
+  },
+  "cross_platform_attack": {
+    "name": "Cross-Platform Attack Chain",
+    "description": "Windows initial access → Linux lateral movement → Cloud impact",
+    "platforms": ["windows", "linux", "cloud"],
+    "stages": [
+      {
+        "stage": "initial_access",
+        "technique": "T1566.001",
+        "platform": "windows"
+      },
+      {
+        "stage": "credential_theft",
+        "technique": "T1003.001",
+        "platform": "windows"
+      },
+      {
+        "stage": "lateral_movement",
+        "technique": "T1021.004",
+        "platform": "linux"
+      },
+      {
+        "stage": "cloud_discovery",
+        "technique": "T1580",
+        "platform": "cloud"
+      },
+      {
+        "stage": "cloud_impact",
+        "technique": "T1530",
+        "platform": "cloud"
+      }
+    ]
+  },
+  "apt_campaign": {
+    "name": "Advanced Persistent Threat Campaign",
+    "description": "Sophisticated multi-stage APT attack with persistence and evasion",
+    "platforms": ["windows", "linux"],
+    "stages": [
+      {
+        "stage": "initial_access",
+        "technique": "T1566.002",
+        "platform": "windows"
+      },
+      {
+        "stage": "execution",
+        "technique": "T1059.001",
+        "platform": "windows"
+      },
+      {
+        "stage": "persistence",
+        "technique": "T1547.001",
+        "platform": "windows"
+      },
+      {
+        "stage": "defense_evasion",
+        "technique": "T1562.001",
+        "platform": "windows"
+      },
+      {
+        "stage": "credential_access",
+        "technique": "T1003.001",
+        "platform": "windows"
+      },
+      {
+        "stage": "discovery",
+        "technique": "T1018",
+        "platform": "windows"
+      },
+      {
+        "stage": "lateral_movement",
+        "technique": "T1021.002",
+        "platform": "windows"
+      },
+      {
+        "stage": "collection",
+        "technique": "T1005",
+        "platform": "windows"
+      },
+      {
+        "stage": "exfiltration",
+        "technique": "T1041",
+        "platform": "windows"
+      }
+    ]
+  }
+}
