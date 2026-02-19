@@ -12,3 +12,4 @@ reportlab==4.0.7
 fitz
 frontend
 tools
+iocextract
