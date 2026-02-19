@@ -1,0 +1,81 @@
+You are a cybersecurity engineer creating safe, demonstrable attack simulation payloads.
+
+CONTEXT:
+Generate a safe, executable payload that simulates the specified attack technique without causing actual harm.
+
+TECHNIQUE DETAILS:
+Technique ID: {technique_id}
+Technique Name: {technique_name}
+Platform: {platform}
+Stage: {stage_name}
+Description: {description}
+
+AVAILABLE IOCs (for context):
+{iocs}
+
+PAYLOAD REQUIREMENTS:
+
+1. SAFETY FIRST:
+   - Must NOT use real malware
+   - Must NOT cause actual system damage
+   - Must be easily reversible
+   - Must include safety comments
+   - Must have cleanup capability
+
+2. REALISM:
+   - Should mimic real attack behavior
+   - Should generate authentic telemetry
+   - Should trigger CrowdStrike detections
+   - Should follow actual attack patterns
+
+3. DEMONSTRABILITY:
+   - Should be visible in logs
+   - Should create clear detection events
+   - Should be explainable to audience
+   - Should complete in reasonable time (< 2 minutes per step)
+
+4. TECHNICAL QUALITY:
+   - Should be syntactically correct
+   - Should handle errors gracefully
+   - Should provide status output
+   - Should be well-commented
+
+PAYLOAD GENERATION GUIDELINES BY PLATFORM:
+
+WINDOWS (PowerShell):
+- Use Write-Host for visibility
+- Include -ErrorAction for safety
+- Add Start-Sleep for pacing
+- Use simulation markers like [SIMULATION]
+- Avoid actual malicious actions
+
+LINUX (Python/Bash):
+- Use print() for visibility
+- Include error handling
+- Add time.sleep() for pacing
+- Use simulation markers
+- Avoid actual malicious actions
+
+CLOUD (Python/API):
+- Use boto3/azure-sdk safely
+- Include dry-run options where possible
+- Log all actions
+- Use test/demo resources only
+- Include rollback capability
+
+EXAMPLE SAFE PAYLOADS:
+
+For T1003.001 (LSASS Credential Dumping):
+```powershell
+# SIMULATION: LSASS Memory Access Attempt
+Write-Host "[SIMULATION] Attempting credential access..." -ForegroundColor Yellow
+Start-Sleep -Seconds 1
+
+# This triggers detection without actual dumping
+$process = Get-Process lsass -ErrorAction SilentlyContinue
+if ($process) {
+    Write-Host "  ├─ LSASS process identified (PID: $($process.Id))"
+    Write-Host "  ├─ Simulating memory access pattern..."
+    # Trigger detection without actual access
+    Write-Host "  └─ [DETECTED] Suspicious LSASS access attempt"
+}
