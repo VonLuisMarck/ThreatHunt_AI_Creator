@@ -12,8 +12,11 @@ echo ""
 
 # Check Python deps
 python3 -c "import streamlit" 2>/dev/null || {
-    echo "⚠  Streamlit not found. Installing..."
-    pip install streamlit pandas
+    echo "⚠  Streamlit not found. Installing all dependencies..."
+    # stix2-elevator needs legacy setuptools to build its C extensions
+    pip install "setuptools<67" --quiet
+    pip install -r requirements.txt --quiet
+    echo "✓ Dependencies installed"
 }
 
 # Check Ollama
