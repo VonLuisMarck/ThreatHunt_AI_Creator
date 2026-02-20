@@ -77,6 +77,10 @@ class IOCExtractor:
         r'(?:User-Agent|user.agent)[:\s]+([^\n\r"\']{10,200})',
         re.IGNORECASE,
     )
+    _RE_FQDN = re.compile(
+        r'\b(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)'
+        r'+(?:[a-zA-Z]{2,63})\b',
+    )
 
     # ─────────────────────────────────────────────────────────────
 
@@ -86,7 +90,7 @@ class IOCExtractor:
         # --- Standard IOCs via iocextract library ---
         ipv4_raw = list(set(iocextract.extract_ipv4s(text, refang=True)))
         ipv6_raw = list(set(iocextract.extract_ipv6s(text)))
-        domains_raw = list(set(iocextract.extract_fqdns(text, refang=True)))
+        domains_raw = self._extract_fqdns_regex(text)
         urls_raw = list(set(iocextract.extract_urls(text, refang=True)))
         emails_raw = list(set(iocextract.extract_emails(text)))
         md5_raw = list(set(iocextract.extract_md5_hashes(text)))
@@ -175,6 +179,12 @@ class IOCExtractor:
         como lateralización, así que las incluimos pero las marcamos.
         """
         return list(set(ips))
+
+    def _extract_fqdns_regex(self, text: str) -> List[str]:
+        """Extrae FQDNs del texto vía regex (iocextract no tiene extract_fqdns)."""
+        matches = self._RE_FQDN.findall(text)
+        # Exclude plain IPv4 addresses that the regex may also match
+        return list({m for m in matches if not re.match(r'^\d{1,3}(\.\d{1,3}){3}$', m)})
 
     def _filter_generic_domains(self, domains: List[str]) -> List[str]:
         """Filtra dominios demasiado genéricos (e.g., microsoft.com, google.com)."""
