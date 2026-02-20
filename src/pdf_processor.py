@@ -134,7 +134,7 @@ class PDFProcessor:
 
     def extract_text(self, pdf_path: str) -> Dict:
         """Extracción avanzada con análisis estructural completo."""
-        doc = fitz.open(pdf_path)
+        doc = fitz.Document(pdf_path)
 
         full_text = ""
         pages = []
