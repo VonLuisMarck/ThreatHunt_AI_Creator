@@ -451,6 +451,7 @@ def run_pipeline(pdf_bytes: bytes, model: str, platform: str) -> dict:
             results["snippets"] = []
             results["playbook"] = {}
             results["summary"] = analysis.get("reasoning", "")
+            results["demo_brief_md"] = ""
             yield "final", results
             return
 
@@ -470,6 +471,7 @@ def run_pipeline(pdf_bytes: bytes, model: str, platform: str) -> dict:
         results["snippets"] = []
         results["playbook"] = {}
         results["summary"] = f"LLM error: {e}"
+        results["demo_brief_md"] = ""
         yield "error", 4, f"LLM error (is Ollama running?): {e}"
         yield "final", results
         return
@@ -488,22 +490,28 @@ def run_pipeline(pdf_bytes: bytes, model: str, platform: str) -> dict:
         yield "error", 5, f"Snippet generation error: {e}"
 
     # ── Step 6: Playbook ─────────────────────────────────────────
-    yield "step", 6, "Generating playbook and narrative summary..."
+    yield "step", 6, "Generating playbook JSON and demo brief..."
     try:
         gen = PlaybookGenerator()
+        # Clean JSON — only what Shadow-Replay needs to execute
         playbook = gen.generate(
             results["analysis"], attack_sequence, results["iocs"], results["ttps"]
         )
+        # Narrative summary (used in the .md brief only)
         summary = llm.generate_playbook_summary(playbook, results["analysis"])
-        playbook["emulation_snippets"] = results["snippets"]
-        playbook["narrative_summary"] = summary
+        # Full demo brief as Markdown (separate output)
+        demo_brief_md = gen.generate_demo_brief(
+            playbook, results["analysis"], results["ttps"], results["snippets"], summary
+        )
         results["playbook"] = playbook
         results["summary"] = summary
+        results["demo_brief_md"] = demo_brief_md
         yield "done", 6, f"Playbook ready — {len(playbook.get('events', []))} events"
     except Exception as e:
         errors["playbook"] = str(e)
         results["playbook"] = {}
         results["summary"] = ""
+        results["demo_brief_md"] = ""
         yield "error", 6, f"Playbook generation error: {e}"
 
     results["errors"] = errors
@@ -702,6 +710,7 @@ if "results" in st.session_state:
     snippets = res.get("snippets", [])
     playbook = res.get("playbook", {})
     summary = res.get("summary", "")
+    demo_brief_md = res.get("demo_brief_md", "")
     filename = st.session_state.get("filename", "report.pdf")
 
     meta = content.get("metadata", {})
@@ -1080,23 +1089,28 @@ if "results" in st.session_state:
                 st.markdown(f"**Platforms:** {', '.join(meta_pb.get('platforms', []))}")
                 st.markdown(f"**TTPs:** {', '.join(meta_pb.get('ttps', []))}")
 
-                # Download buttons
+                # Download buttons — two separate outputs
                 st.markdown("<br>", unsafe_allow_html=True)
+                pid = playbook.get("playbook_id", "playbook")
+
+                # Output 1: clean JSON (only what Shadow-Replay needs to run)
                 playbook_json = json.dumps(playbook, indent=2, default=str)
                 st.download_button(
-                    label="⬇️ Download Playbook JSON",
+                    label="⬇️ Playbook JSON (runner)",
                     data=playbook_json,
-                    file_name=f"{playbook.get('playbook_id', 'playbook')}.json",
+                    file_name=f"{pid}.json",
                     mime="application/json",
+                    help="Clean JSON for Shadow-Replay — agents + events + payloads only",
                 )
 
-                if snippets:
-                    snippets_json = json.dumps(snippets, indent=2, default=str)
+                # Output 2: demo brief markdown
+                if demo_brief_md:
                     st.download_button(
-                        label="⬇️ Download Emulation Snippets",
-                        data=snippets_json,
-                        file_name=f"{playbook.get('playbook_id', 'playbook')}_snippets.json",
-                        mime="application/json",
+                        label="⬇️ Demo Brief (.md)",
+                        data=demo_brief_md,
+                        file_name=f"{pid}_demo_brief.md",
+                        mime="text/markdown",
+                        help="Full demo guide — threat briefing, infra requirements, TTPs, snippets",
                     )
 
         # Agents
@@ -1134,7 +1148,12 @@ if "results" in st.session_state:
                         lang = "powershell" if ev.get("payload_type") == "powershell" else "python"
                         st.code(ev.get("payload", ""), language=lang)
 
-        # Raw JSON
+        # Demo Brief preview
+        if demo_brief_md:
+            with st.expander("📄 Demo Brief preview (.md)"):
+                st.markdown(demo_brief_md)
+
+        # Raw JSON — clean runner payload
         if playbook:
-            with st.expander("🔧 Raw Playbook JSON"):
+            with st.expander("🔧 Raw Playbook JSON (runner)"):
                 st.json(playbook)

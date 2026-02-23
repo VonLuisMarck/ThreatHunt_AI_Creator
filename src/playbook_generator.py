@@ -59,8 +59,11 @@ class PlaybookGenerator:
 
     def generate(self, analysis: Dict, attack_sequence: List[Dict],
                  iocs: Dict, ttps: List[Dict]) -> Dict:
-        """Genera playbook completo compatible con Shadow-Replay."""
-
+        """
+        Genera playbook JSON limpio compatible con Shadow-Replay.
+        Solo contiene lo necesario para ejecutar: agents + events con payloads.
+        Todo el contexto de demo va en generate_demo_brief().
+        """
         playbook_id = self._generate_id(analysis.get("campaign_name", "unknown"))
         agents      = self._determine_agents(attack_sequence)
         events      = self._generate_events(attack_sequence, agents, iocs)
@@ -70,15 +73,213 @@ class PlaybookGenerator:
             "name":             analysis.get("campaign_name", "Unknown Campaign"),
             "description":      analysis.get("reasoning", ""),
             "generated_at":     datetime.now().isoformat(),
-            "source_report":    analysis.get("threat_actor", "Unknown"),
             "mandatory_agents": agents,
             "events":           events,
-            "metadata": {
-                "ttps":      [t["id"] for t in ttps],
-                "platforms": analysis.get("platforms", []),
-                "risk_level": analysis.get("demo_risk", "medium"),
-            },
         }
+
+    def generate_demo_brief(
+        self,
+        playbook: Dict,
+        analysis: Dict,
+        ttps: List[Dict],
+        snippets: List[Dict],
+        summary: str,
+    ) -> str:
+        """
+        Genera el brief de demo en Markdown.
+        Incluye: threat briefing, requisitos de infra, TTPs, cadena de ataque,
+        puntos de detección y snippets de emulación.
+        """
+        now = datetime.now().strftime("%Y-%m-%d %H:%M")
+        actor = analysis.get("threat_actor", "Unknown")
+        campaign = analysis.get("campaign_name", "Unknown Campaign")
+        pid = playbook.get("playbook_id", "N/A")
+        risk = analysis.get("demo_risk", "medium").upper()
+        complexity = analysis.get("demo_complexity", "N/A")
+        setup_time = analysis.get("setup_time", "N/A")
+        attack_vector = analysis.get("attack_vector", "N/A")
+        platforms = ", ".join(analysis.get("platforms", [])) or "N/A"
+        industries = ", ".join(analysis.get("target_industries", [])) or "N/A"
+        geography = ", ".join(analysis.get("target_geography", [])) or "N/A"
+        cs_products = analysis.get("crowdstrike_products", [])
+        detection_points = analysis.get("key_detection_points", [])
+        attack_stages = analysis.get("attack_stages", [])
+
+        lines: List[str] = []
+
+        # ── Header ────────────────────────────────────────────────
+        lines += [
+            f"# Demo Brief — {campaign}",
+            f"",
+            f"| Field | Value |",
+            f"|-------|-------|",
+            f"| **Threat Actor** | {actor} |",
+            f"| **Playbook ID** | `{pid}` |",
+            f"| **Risk Level** | {risk} |",
+            f"| **Complexity** | {complexity} |",
+            f"| **Setup Time** | {setup_time} |",
+            f"| **Generated** | {now} |",
+            f"",
+        ]
+
+        # ── Threat Briefing ───────────────────────────────────────
+        lines += [
+            "---",
+            "## Threat Briefing",
+            "",
+            f"- **Actor type:** {analysis.get('threat_actor_type', 'N/A')}",
+            f"- **Attack vector:** {attack_vector}",
+            f"- **Target platforms:** {platforms}",
+            f"- **Target industries:** {industries}",
+            f"- **Target geography:** {geography}",
+        ]
+        if analysis.get("attribution_confidence"):
+            lines.append(f"- **Attribution confidence:** {analysis['attribution_confidence']}")
+        if analysis.get("reasoning"):
+            lines += ["", f"> {analysis['reasoning']}", ""]
+
+        # ── Infrastructure Requirements ────────────────────────────
+        lines += [
+            "---",
+            "## Infrastructure Requirements",
+            "",
+            "### Agents",
+            "",
+            "| Agent ID | Type | IP / Endpoint | Notes |",
+            "|----------|------|---------------|-------|",
+        ]
+        for agent in playbook.get("mandatory_agents", []):
+            atype = agent["agent_type"]
+            if atype == "windows":
+                ip_note = f"`{self.win_detection_ip}` | Domain-joined, CrowdStrike in **detection** mode"
+            elif atype == "linux":
+                ip_note = f"`{self.linux_ip}` | SSH `{self.linux_user}/{self.linux_pass}`, no EDR"
+            else:
+                ip_note = "Cloud environment | N/A"
+            lines.append(f"| `{agent['agent_id']}` | {atype} | {ip_note} |")
+
+        lines += [
+            "",
+            f"- **C2 server:** `{self.c2_ip}:{self.c2_port}` — must be reachable from all agents",
+            "",
+            "### Pre-Demo Checklist",
+            "",
+        ]
+
+        # Build checklist based on what agents/techniques are used
+        event_ids = [ev.get("event_id", "") for ev in playbook.get("events", [])]
+        uses_windows = any(
+            a["agent_type"] == "windows" for a in playbook.get("mandatory_agents", [])
+        )
+        uses_linux = any(
+            a["agent_type"] == "linux" for a in playbook.get("mandatory_agents", [])
+        )
+        uses_lateral = any("T1021" in ev.get("mitre_technique", "") for ev in playbook.get("events", []))
+        uses_tool_transfer = any("T1105" in ev.get("mitre_technique", "") for ev in playbook.get("events", []))
+
+        lines.append("- [ ] Shadow-Replay runner deployed and reachable")
+        lines.append(f"- [ ] C2 server listening on `{self.c2_ip}:{self.c2_port}`")
+        if uses_windows:
+            lines.append(f"- [ ] Windows agent installed on `{self.win_detection_ip}` (CrowdStrike sensor in **detection** mode)")
+            lines.append(f"- [ ] Windows unmanaged machine available at `{self.win_unmanaged_ip}` (prevention mode, for contrast)")
+        if uses_linux:
+            lines.append(f"- [ ] Linux machine reachable at `{self.linux_ip}` via SSH (`{self.linux_user}` / `{self.linux_pass}`)")
+        if uses_lateral:
+            lines.append("- [ ] `Posh-SSH` module available on Windows agent (`Install-Module Posh-SSH`)")
+        if uses_tool_transfer:
+            lines.append(f"- [ ] Agent binary hosted at `{self.c2_url}/downloads/agent_linux.py` and `agent-windows.py`")
+        if cs_products:
+            lines.append("- [ ] CrowdStrike products confirmed active:")
+            for p in cs_products:
+                lines.append(f"  - [ ] {p}")
+        lines.append("- [ ] Palo Alto logging enabled for demo subnet `10.5.9.0/24`")
+        lines.append("- [ ] Audience briefed: this is a **safe simulation**, no real malware")
+
+        # ── MITRE ATT&CK TTPs ─────────────────────────────────────
+        lines += [
+            "",
+            "---",
+            "## MITRE ATT\u0026CK TTPs",
+            "",
+            "| ID | Name | Tactic | Platform |",
+            "|----|------|--------|----------|",
+        ]
+        for t in ttps:
+            tac = ", ".join(t.get("tactics") or [])
+            plat = ", ".join(t.get("platforms") or [])
+            lines.append(f"| `{t['id']}` | {t['name']} | {tac} | {plat} |")
+
+        # ── Attack Chain ──────────────────────────────────────────
+        lines += [
+            "",
+            "---",
+            "## Attack Chain",
+            "",
+        ]
+        attack_events = [ev for ev in playbook.get("events", []) if "cleanup" not in ev.get("event_id", "")]
+        for i, ev in enumerate(attack_events, 1):
+            tid = ev.get("mitre_technique", "")
+            lines.append(f"### {i}. {ev.get('name', ev['event_id'])} (`{tid}`)")
+            lines.append(f"- **Agent:** `{ev['agent_id']}` ({ev.get('required_agent_type', '')})")
+            lines.append(f"- **Payload type:** {ev.get('payload_type', '')}")
+            lines.append(f"- **Next step:** `{ev.get('success_trigger') or 'END'}`")
+            lines.append(f"- **On failure:** {ev.get('failure_action', 'abort')}")
+            lines.append("")
+
+        # ── Detection Points ──────────────────────────────────────
+        if detection_points:
+            lines += [
+                "---",
+                "## CrowdStrike Detection Points",
+                "",
+            ]
+            for dp in detection_points:
+                lines.append(f"- {dp}")
+            lines.append("")
+
+        # ── Narrative Summary ─────────────────────────────────────
+        if summary:
+            lines += [
+                "---",
+                "## Narrative Summary",
+                "",
+                summary,
+                "",
+            ]
+
+        # ── Emulation Snippets ────────────────────────────────────
+        if snippets:
+            lines += [
+                "---",
+                "## Emulation Snippets",
+                "",
+                "> All snippets use simulation markers — no real malicious actions.",
+                "",
+            ]
+            for sn in snippets:
+                tid = sn.get("technique_id", "")
+                name = sn.get("name", "")
+                tactic = sn.get("tactic", "")
+                lang = "powershell" if sn.get("platform") == "windows" else "python"
+                notes = sn.get("detection_notes", "")
+                if isinstance(notes, list):
+                    notes = " | ".join(str(n) for n in notes[:3])
+                lines += [
+                    f"### `{tid}` — {name}",
+                    f"**Tactic:** {tactic}  |  **Source:** {sn.get('source', 'N/A')}",
+                    "",
+                ]
+                if notes:
+                    lines.append(f"> Detection: {notes}")
+                    lines.append("")
+                lines += [
+                    f"```{lang}",
+                    sn.get("code", ""),
+                    "```",
+                    "",
+                ]
+
+        return "\n".join(lines)
 
     # ──────────────────────────────────────────────────────────────
     #  Agent assignment
