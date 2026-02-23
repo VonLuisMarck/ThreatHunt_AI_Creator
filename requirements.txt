@@ -15,3 +15,10 @@ reportlab==4.0.7
 streamlit>=1.32.0
 pandas>=2.0.0
 xlsxwriter
+# ── LLM providers (install only what you need) ───────────────────
+# Anthropic Claude API (recommended for best quality):
+#   pip install langchain-anthropic
+# OpenAI API:
+#   pip install langchain-openai
+langchain-anthropic>=0.1.0
+langchain-openai>=0.1.0

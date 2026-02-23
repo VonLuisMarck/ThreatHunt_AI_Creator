@@ -1,6 +1,15 @@
 llm:
-  model: llama3           # Ollama model name
+  # Provider: ollama | anthropic | openai
+  # ollama    → local model, no cost, lower quality (good for dev)
+  # anthropic → Claude API, best quality (export ANTHROPIC_API_KEY=sk-ant-...)
+  # openai    → GPT-4 API, good quality   (export OPENAI_API_KEY=sk-...)
+  provider: ollama
+  model: llama3
   temperature: 0.1
+  # Recommended models per provider:
+  #   ollama:    llama3.1:70b, mixtral:8x7b
+  #   anthropic: claude-opus-4-6, claude-sonnet-4-5-20250929
+  #   openai:    gpt-4o, gpt-4-turbo
 
 output:
   playbook_dir: playbooks

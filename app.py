@@ -3,6 +3,7 @@ ThreatHunt AI Creator — Streamlit Web Interface
 Run with: streamlit run app.py
 """
 
+import os
 import streamlit as st
 import tempfile
 import json
@@ -385,7 +386,7 @@ def tactic_pill(tactic: str) -> str:
     return f'<span class="tactic-pill" style="background:{color}22;color:{color};border:1px solid {color}">{tactic}</span>'
 
 
-def run_pipeline(pdf_bytes: bytes, model: str, platform: str) -> dict:
+def run_pipeline(pdf_bytes: bytes, model: str, platform: str, provider: str = "ollama") -> dict:
     """Runs the full analysis pipeline and returns all results."""
     from src.pdf_processor import PDFProcessor
     from src.ioc_extractor import IOCExtractor
@@ -441,7 +442,7 @@ def run_pipeline(pdf_bytes: bytes, model: str, platform: str) -> dict:
     # ── Step 4: LLM Analysis ─────────────────────────────────────
     yield "step", 4, "Running deep LLM analysis (this may take 1-2 min)..."
     try:
-        llm = LLMAnalyzer(model_name=model)
+        llm = LLMAnalyzer(model_name=model, provider=provider)
         analysis = llm.analyze_report(content, results["iocs"], results["ttps"])
         results["analysis"] = analysis
 
@@ -541,11 +542,30 @@ with st.sidebar:
     st.markdown("---")
     st.markdown("**Configuration**")
 
+    # Provider selector
+    _PROVIDER_MODELS = {
+        "ollama":    ["llama3", "llama3.1:70b", "llama3.2", "llama3.3:70b", "mixtral:8x7b", "mistral"],
+        "anthropic": ["claude-opus-4-6", "claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"],
+        "openai":    ["gpt-4o", "gpt-4-turbo", "gpt-4"],
+    }
+    _PROVIDER_LABELS = {
+        "ollama":    "🖥️ Ollama (local)",
+        "anthropic": "🤖 Claude (Anthropic API)",
+        "openai":    "🟢 OpenAI API",
+    }
+
+    llm_provider = st.selectbox(
+        "LLM Provider",
+        options=list(_PROVIDER_MODELS.keys()),
+        format_func=lambda p: _PROVIDER_LABELS[p],
+        index=0,
+    )
+
     col1, col2 = st.columns(2)
     with col1:
         llm_model = st.selectbox(
-            "LLM Model",
-            ["llama3", "llama3.1", "llama3.2", "llama2", "mistral", "mixtral"],
+            "Model",
+            _PROVIDER_MODELS[llm_provider],
             index=0,
         )
     with col2:
@@ -554,6 +574,20 @@ with st.sidebar:
             ["windows", "linux"],
             index=0,
         )
+
+    # API key hint for non-Ollama providers
+    if llm_provider == "anthropic":
+        api_key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
+        if api_key_set:
+            st.success("✅ ANTHROPIC_API_KEY set", icon=None)
+        else:
+            st.warning("⚠️ Set `ANTHROPIC_API_KEY` env var")
+    elif llm_provider == "openai":
+        api_key_set = bool(os.environ.get("OPENAI_API_KEY"))
+        if api_key_set:
+            st.success("✅ OPENAI_API_KEY set", icon=None)
+        else:
+            st.warning("⚠️ Set `OPENAI_API_KEY` env var")
 
     st.markdown("---")
     analyze_btn = st.button("🚀 Analyze Report", disabled=uploaded_file is None)
@@ -572,9 +606,14 @@ with st.sidebar:
     """, unsafe_allow_html=True)
 
     st.markdown("---")
-    st.markdown("""
+    _req_line = {
+        "ollama": "Requires Ollama running locally",
+        "anthropic": "Requires ANTHROPIC_API_KEY",
+        "openai": "Requires OPENAI_API_KEY",
+    }
+    st.markdown(f"""
     <div style="font-size:0.7rem;color:#444;text-align:center">
-    Requires Ollama + llama3<br>
+    {_req_line[llm_provider]}<br>
     All simulation code is safe
     </div>
     """, unsafe_allow_html=True)
@@ -659,7 +698,7 @@ if analyze_btn and uploaded_file:
         progress_bar = st.progress(0, text="Starting analysis...")
         status_container = st.empty()
 
-    for event in run_pipeline(pdf_bytes, llm_model, platform):
+    for event in run_pipeline(pdf_bytes, llm_model, platform, provider=llm_provider):
         kind = event[0]
 
         if kind == "step":

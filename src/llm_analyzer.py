@@ -1,4 +1,3 @@
-from langchain_community.llms import Ollama
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
 from typing import Dict, List, Optional
@@ -29,27 +28,89 @@ def _load_lab_context(config_path: str = "config.yaml") -> str:
         return ""
 
 
+def _build_llm(provider: str, model_name: str, temperature: float = 0.1):
+    """
+    Factory que instancia el LLM correcto según el proveedor.
+
+    Proveedores soportados:
+    - ollama    → Ollama local (llama3, llama3.1:70b, mixtral, etc.)
+    - anthropic → Claude API  (claude-opus-4-6, claude-sonnet-4-5, claude-haiku-4-5)
+    - openai    → OpenAI API  (gpt-4o, gpt-4-turbo, gpt-4)
+
+    Las API keys se leen de variables de entorno:
+    - ANTHROPIC_API_KEY
+    - OPENAI_API_KEY
+    """
+    if provider == "anthropic":
+        from langchain_anthropic import ChatAnthropic
+        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
+        if not api_key:
+            raise ValueError(
+                "ANTHROPIC_API_KEY not set. Export it: export ANTHROPIC_API_KEY=sk-ant-..."
+            )
+        return ChatAnthropic(
+            model=model_name,
+            temperature=temperature,
+            anthropic_api_key=api_key,
+            max_tokens=4096,
+        )
+
+    if provider == "openai":
+        from langchain_openai import ChatOpenAI
+        api_key = os.environ.get("OPENAI_API_KEY", "")
+        if not api_key:
+            raise ValueError(
+                "OPENAI_API_KEY not set. Export it: export OPENAI_API_KEY=sk-..."
+            )
+        return ChatOpenAI(
+            model=model_name,
+            temperature=temperature,
+            openai_api_key=api_key,
+        )
+
+    # Default: Ollama local
+    from langchain_community.llms import Ollama
+    return Ollama(model=model_name, temperature=temperature)
+
+
+# Context window per provider — determines how much text we send per call
+_CONTEXT_LIMITS = {
+    "anthropic": 16000,   # Claude has 200k context, we use 16k per call to be safe
+    "openai":    12000,   # GPT-4o has 128k context
+    "ollama":     4000,   # Local models: conservative default
+}
+
+
 class LLMAnalyzer:
     """
-    Analiza reportes de amenazas usando LLM local (Ollama).
+    Analiza reportes de amenazas usando LLM (Ollama local, Claude API u OpenAI).
+
+    Proveedores:
+    - ollama    : llama3, llama3.1:70b, mixtral, etc. (local, sin coste, menor calidad)
+    - anthropic : claude-opus-4-6, claude-sonnet-4-5  (API, mayor calidad)
+    - openai    : gpt-4o, gpt-4-turbo                 (API, buena calidad)
 
     Mejoras sobre la versión original:
-    - Procesamiento del texto COMPLETO mediante chunking (no solo 4000 chars)
+    - Multi-proveedor con context window adaptativo
+    - Procesamiento del texto COMPLETO mediante chunking
     - Extracción robusta de JSON con fallbacks
-    - suggest_emulation_snippets(): genera código de emulación por técnica
-    - generate_playbook_summary(): resumen narrativo del playbook
-    - Prompts más ricos y estructurados
-    - Lab context (arquitectura del laboratorio) inyectado en todos los prompts
+    - Lab context inyectado en todos los prompts
     """
 
-    # Max chars to send per LLM call
-    CHUNK_SIZE = 4000
-    # Max chunks to summarize before final analysis
     MAX_CHUNKS = 6
 
-    def __init__(self, model_name: str = "llama3", config_path: str = "config.yaml"):
-        self.llm = Ollama(model=model_name, temperature=0.1)
+    def __init__(
+        self,
+        model_name: str = "llama3",
+        provider: str = "ollama",
+        config_path: str = "config.yaml",
+    ):
+        self.provider = provider
+        self.model_name = model_name
+        self.llm = _build_llm(provider, model_name)
         self.lab_context = _load_lab_context(config_path)
+        # Adapt chunk size to provider's context window
+        self.CHUNK_SIZE = _CONTEXT_LIMITS.get(provider, 4000)
 
     # ──────────────────────────────────────────────────────────────
     #  Main analysis (processes FULL document via chunking)
