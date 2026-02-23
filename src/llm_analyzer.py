@@ -4,8 +4,29 @@ from langchain.chains import LLMChain
 from typing import Dict, List, Optional
 import json
 import re
+import os
 
+import yaml
 from src.emulation_library import get_emulation_snippet, get_all_covered_techniques
+
+
+def _load_lab_context(config_path: str = "config.yaml") -> str:
+    """
+    Lee la ruta del system prompt de arquitectura desde config.yaml y devuelve su contenido.
+    Falla silenciosamente si el archivo no existe para no romper flujos sin lab context.
+    """
+    try:
+        with open(config_path, "r") as f:
+            cfg = yaml.safe_load(f)
+        prompt_path = cfg.get("lab", {}).get("lab_context_prompt", "")
+        if not prompt_path:
+            return ""
+        base_dir = os.path.dirname(os.path.abspath(config_path))
+        full_path = os.path.join(base_dir, prompt_path)
+        with open(full_path, "r") as f:
+            return f.read().strip()
+    except Exception:
+        return ""
 
 
 class LLMAnalyzer:
@@ -18,6 +39,7 @@ class LLMAnalyzer:
     - suggest_emulation_snippets(): genera código de emulación por técnica
     - generate_playbook_summary(): resumen narrativo del playbook
     - Prompts más ricos y estructurados
+    - Lab context (arquitectura del laboratorio) inyectado en todos los prompts
     """
 
     # Max chars to send per LLM call
@@ -25,8 +47,9 @@ class LLMAnalyzer:
     # Max chunks to summarize before final analysis
     MAX_CHUNKS = 6
 
-    def __init__(self, model_name: str = "llama3"):
+    def __init__(self, model_name: str = "llama3", config_path: str = "config.yaml"):
         self.llm = Ollama(model=model_name, temperature=0.1)
+        self.lab_context = _load_lab_context(config_path)
 
     # ──────────────────────────────────────────────────────────────
     #  Main analysis (processes FULL document via chunking)
@@ -61,8 +84,10 @@ class LLMAnalyzer:
         """Genera secuencia de ataque basada en el análisis y los TTPs."""
 
         prompt = PromptTemplate(
-            input_variables=["analysis", "ttps"],
-            template="""You are a cybersecurity automation engineer creating attack simulation sequences.
+            input_variables=["lab_context", "analysis", "ttps"],
+            template="""{lab_context}
+
+You are a cybersecurity automation engineer creating attack simulation sequences.
 
 THREAT ANALYSIS:
 {analysis}
@@ -93,6 +118,7 @@ Respond with valid JSON array ONLY, no other text:
 
         chain = LLMChain(llm=self.llm, prompt=prompt)
         result = chain.run(
+            lab_context=self.lab_context,
             analysis=json.dumps(analysis, indent=2),
             ttps=json.dumps(ttps[:15], indent=2),  # Top 15 TTPs
         )
@@ -175,8 +201,10 @@ Respond with valid JSON array ONLY, no other text:
         Incluye: qué hace, cómo se ejecuta, qué detecta CrowdStrike.
         """
         prompt = PromptTemplate(
-            input_variables=["playbook", "analysis"],
-            template="""You are a cybersecurity expert creating a human-readable summary of an attack simulation playbook.
+            input_variables=["lab_context", "playbook", "analysis"],
+            template="""{lab_context}
+
+You are a cybersecurity expert creating a human-readable summary of an attack simulation playbook.
 
 PLAYBOOK DATA:
 {playbook}
@@ -211,6 +239,7 @@ Do NOT use JSON format - write in paragraph/list format.
         ]
 
         result = chain.run(
+            lab_context=self.lab_context,
             playbook=json.dumps(playbook_trimmed, indent=2),
             analysis=json.dumps(analysis, indent=2),
         )
@@ -373,9 +402,12 @@ Respond with JSON only:""",
         lang = "PowerShell" if platform == "windows" else "Python"
 
         prompt = PromptTemplate(
-            input_variables=["technique_id", "technique_name", "description",
-                             "stage_desc", "platform", "lang", "iocs_sample"],
-            template="""You are a cybersecurity engineer creating a SAFE attack simulation snippet.
+            input_variables=["lab_context", "technique_id", "technique_name",
+                             "description", "stage_desc", "platform", "lang",
+                             "iocs_sample"],
+            template="""{lab_context}
+
+You are a cybersecurity engineer creating a SAFE attack simulation snippet.
 
 TECHNIQUE: {technique_id} - {technique_name}
 DESCRIPTION: {description}
@@ -390,6 +422,7 @@ Write a SAFE simulation snippet in {lang} that:
 3. Uses [SIMULATION] markers clearly
 4. Includes cleanup if needed
 5. Has comments explaining what detection it triggers
+6. Uses the exact IPs, credentials, and C2 port from the lab architecture above
 
 Respond with ONLY the code, no explanation:""",
         )
@@ -402,6 +435,7 @@ Respond with ONLY the code, no explanation:""",
 
         try:
             code = chain.run(
+                lab_context=self.lab_context,
                 technique_id=technique_id,
                 technique_name=ttp_meta.get("name", technique_id),
                 description=ttp_meta.get("description", "No description")[:200],

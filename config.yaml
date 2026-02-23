@@ -7,3 +7,60 @@ output:
 
 demo:
   platform: windows       # Default emulation platform: windows | linux
+
+# ─────────────────────────────────────────────────────────────────────────────
+# LAB ARCHITECTURE
+# Update this section when the lab topology changes.
+# llm_analyzer.py reads lab_context_prompt (path) and injects it into prompts.
+# playbook_generator.py reads the machines/c2 blocks for hardcoded targets.
+# ─────────────────────────────────────────────────────────────────────────────
+lab:
+  lab_context_prompt: promtps/lab_context.txt   # system-prompt file with full topology
+
+  machines:
+    win_prevention:
+      ip: "10.5.9.30"
+      os: windows
+      domain_joined: true
+      edr: crowdstrike
+      edr_mode: prevention
+    win_detection:
+      ip: "10.5.9.31"
+      os: windows
+      domain_joined: true
+      edr: crowdstrike
+      edr_mode: detection
+    linux_victim:
+      ip: "10.5.9.40"
+      os: linux
+      domain_joined: false
+      edr: none
+      ssh_user: samba
+      ssh_password: password123
+    win_unmanaged:
+      ip: "10.5.9.27"
+      os: windows
+      domain_joined: false
+      edr: none
+
+  c2:
+    ip: "10.5.9.41"
+    os: ubuntu
+    port: 4444
+
+  auxiliary:
+    kali:
+      ip: "10.5.9.21"
+      os: kali
+
+  integrations:
+    firewall:
+      vendor: palo_alto
+      monitors_pairs:             # traffic between these pairs is logged
+        - ["10.5.9.30", "10.5.9.41"]
+        - ["10.5.9.31", "10.5.9.41"]
+        - ["10.5.9.30", "10.5.9.21"]
+        - ["10.5.9.31", "10.5.9.21"]
+    email:
+      vendor: mimecast
+      position: mx_gateway        # all mail to domain passes through mimecast

