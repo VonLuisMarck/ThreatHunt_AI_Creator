@@ -213,8 +213,9 @@ class PlaybookGenerator:
                 return self._ps_exfiltration()
 
             # Generic Windows fallback
+            desc = stage.get("description", "Executing stage")
             return (
-                f"Write-Host '[{tid}] {stage.get(\"description\", \"Executing stage\")}'; "
+                f"Write-Host '[{tid}] {desc}'; "
                 f"Write-Host '  └─ Target: {self.win_detection_ip} → C2: {self.c2_ip}:{self.c2_port}'"
             )
 
