@@ -2,7 +2,7 @@ pymupdf==1.23.8
 iocextract==1.16.1
 # mitreattack-python requires stix2-elevator which needs legacy setuptools to build.
 # Install order: pip install "setuptools<67" first, then pip install -r requirements.txt
-mitreattack-python==3.0.3
+mitreattack-python
 stix2-elevator==4.1.7
 chromadb==0.4.22
 langchain==0.1.0
