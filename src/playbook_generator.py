@@ -1,4 +1,5 @@
 from typing import Dict, List, Optional
+import base64
 import json
 import yaml
 import os
@@ -363,7 +364,10 @@ class PlaybookGenerator:
                 "agent_id":           agent["agent_id"],
                 "required_agent_type": agent["agent_type"],
                 "payload_type":       payload_type,
-                "payload":            self._generate_payload(stage, iocs, agent["agent_type"]),
+                "payload":            self._to_oneliner(
+                    self._generate_payload(stage, iocs, agent["agent_type"]),
+                    payload_type,
+                ),
                 "mitre_technique":    stage.get("technique_id", ""),
                 "success_trigger":    next_trigger,
                 "failure_action":     "abort" if idx < 2 else "continue",
@@ -714,7 +718,7 @@ class PlaybookGenerator:
                 "agent_id":            agent["agent_id"],
                 "required_agent_type": agent["agent_type"],
                 "payload_type":        payload_type,
-                "payload":             payload,
+                "payload":             self._to_oneliner(payload, payload_type),
                 "success_trigger":     next_cleanup,
                 "failure_action":      "continue",
             })
@@ -724,6 +728,38 @@ class PlaybookGenerator:
     # ──────────────────────────────────────────────────────────────
     #  Helpers
     # ──────────────────────────────────────────────────────────────
+
+    @staticmethod
+    def _to_oneliner(code: str, payload_type: str) -> str:
+        """
+        Collapses multi-line code into a single executable line.
+
+        PowerShell : removes standalone comment lines (#), joins with space
+                     (templates already terminate each statement with ;).
+        Python      : sequential statements → semicolon-join.
+                     Indented blocks (for/if/try/with) → base64 exec wrapper
+                     so the payload remains a single importable line.
+        """
+        if payload_type == "powershell":
+            lines = [
+                line.strip()
+                for line in code.splitlines()
+                if line.strip() and not line.strip().startswith("#")
+            ]
+            return " ".join(lines)
+
+        # Python
+        raw_lines = [l for l in code.splitlines() if l.strip()]
+        has_indent = any(l != l.lstrip() for l in raw_lines)
+        if has_indent:
+            encoded = base64.b64encode(code.strip().encode()).decode()
+            return f"import base64; exec(base64.b64decode('{encoded}').decode())"
+        lines = [
+            l.strip()
+            for l in code.splitlines()
+            if l.strip() and not l.strip().startswith("#")
+        ]
+        return "; ".join(lines)
 
     def _generate_id(self, campaign_name: str) -> str:
         clean = campaign_name.lower().replace(" ", "_").replace("-", "_")
