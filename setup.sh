@@ -32,7 +32,7 @@ pip install -r requirements.txt
 
 # Descargar MITRE ATT&CK data
 echo "Downloading MITRE ATT&CK data..."
-wget -q https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json
+curl -fsSL -o enterprise-attack.json https://raw.githubusercontent.com/mitre/cti/master/enterprise-attack/enterprise-attack.json
 
 # Crear reporte de ejemplo
 echo "Creating sample report..."

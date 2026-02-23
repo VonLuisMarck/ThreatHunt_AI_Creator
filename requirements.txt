@@ -1,24 +1,20 @@
-pymupdf==1.23.8
-iocextract==1.16.1
-# mitreattack-python requires stix2-elevator which needs legacy setuptools to build.
-# Install order: pip install "setuptools<67" first, then pip install -r requirements.txt
+pymupdf>=1.23.8
+iocextract>=1.16.1
+# mitreattack-python: stix2-elevator removed (caused resolution-too-deep errors)
 mitreattack-python
-stix2-elevator==4.1.7
-chromadb==0.4.22
-langchain==0.1.0
-langchain-community==0.0.13
-sentence-transformers==2.3.1
-ollama==0.1.6
-pyyaml==6.0.1
-pydantic==2.5.3
-reportlab==4.0.7
+chromadb>=0.5.0
+langchain>=0.3.0
+langchain-community>=0.3.0
+sentence-transformers>=2.7.0
+ollama>=0.1.6
+pyyaml>=6.0.1
+pydantic>=2.5.3
+reportlab>=4.0.7
 streamlit>=1.32.0
 pandas>=2.0.0
 xlsxwriter
 # ── LLM providers (install only what you need) ───────────────────
 # Anthropic Claude API (recommended for best quality):
-#   pip install langchain-anthropic
+langchain-anthropic>=0.3.0
 # OpenAI API:
-#   pip install langchain-openai
-langchain-anthropic>=0.1.0
-langchain-openai>=0.1.0
+langchain-openai>=0.3.0
