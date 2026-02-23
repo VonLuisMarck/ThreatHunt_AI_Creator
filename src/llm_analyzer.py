@@ -156,7 +156,7 @@ THREAT ANALYSIS:
 AVAILABLE TTPs (MITRE ATT&CK):
 {ttps}
 
-Create a logical, chronological attack sequence for safe lab demonstration.
+Create a logical, chronological attack sequence for lab execution.
 For each stage provide:
 - stage: snake_case name
 - stage_number: sequential integer
@@ -166,7 +166,7 @@ For each stage provide:
 - execution_method: powershell/python/bash/api
 - description: what happens in this stage
 - technical_details: how it works technically
-- simulation_approach: how to simulate safely
+- execution_approach: how to execute this technique in the isolated lab using real lab infrastructure
 - telemetry_generated: list of telemetry events
 - crowdstrike_detections: list of what CrowdStrike detects
 - detection_severity: low/medium/high/critical
@@ -468,7 +468,7 @@ Respond with JSON only:""",
                              "iocs_sample"],
             template="""{lab_context}
 
-You are a cybersecurity engineer creating a SAFE attack simulation snippet.
+You are a cybersecurity engineer creating a real attack emulation snippet for an isolated lab environment.
 
 TECHNIQUE: {technique_id} - {technique_name}
 DESCRIPTION: {description}
@@ -477,13 +477,13 @@ PLATFORM: {platform}
 LANGUAGE: {lang}
 IOCs FROM REPORT (for context): {iocs_sample}
 
-Write a SAFE simulation snippet in {lang} that:
-1. Does NOT cause actual harm (no real malware, no real damage)
-2. Generates realistic telemetry for CrowdStrike to detect
-3. Uses [SIMULATION] markers clearly
-4. Includes cleanup if needed
-5. Has comments explaining what detection it triggers
-6. Uses the exact IPs, credentials, and C2 port from the lab architecture above
+Write a real, fully executable {lang} snippet for the isolated lab that:
+1. Actually executes the technique to generate authentic telemetry and trigger real CrowdStrike detections
+2. Uses the exact IPs, credentials, and C2 port from the lab architecture above — never use placeholders
+3. Labels the target machine at the top, e.g.: # [WIN-DETECTION 10.5.9.31]
+4. Includes cleanup at the end if files, registry keys, or connections are created
+5. Has inline comments explaining which CrowdStrike detection each step triggers
+6. Must be syntactically correct and executable as-is in the lab
 
 Respond with ONLY the code, no explanation:""",
         )
