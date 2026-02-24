@@ -4,6 +4,10 @@ Run with: streamlit run app.py
 """
 
 import os
+# Load .env before anything else so API keys are available to all providers
+from dotenv import load_dotenv
+load_dotenv()
+
 import streamlit as st
 import tempfile
 import json
@@ -864,19 +868,21 @@ with st.sidebar:
             index=0,
         )
 
-    # Per-agent model configuration (multi-agent mode only)
+    # ── Per-agent model configuration (multi-agent mode only) ────────
     _ALL_CLAUDE = ["claude-opus-4-6", "claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"]
     _ALL_GPT    = ["gpt-4o", "gpt-4-turbo", "gpt-4"]
-    _ALL_OLLAMA = ["llama3", "llama3.1:70b", "mixtral:8x7b", "mistral"]
+    _ALL_OLLAMA = ["llama3", "llama3.1:70b", "llama3.2", "mixtral:8x7b", "mistral", "codellama"]
     _AGENT_MODEL_OPTIONS = {
         "anthropic": _ALL_CLAUDE,
         "openai":    _ALL_GPT,
         "ollama":    _ALL_OLLAMA,
     }
+    _PROVIDER_ICONS = {"anthropic": "🤖", "openai": "🟢", "ollama": "🖥️"}
+    # (key, label, default_model, default_provider)
     _AGENT_SIDEBAR_DEFS = [
         ("recon",              "🔍 Recon",       "claude-haiku-4-5-20251001",   "anthropic"),
         ("threat_intel",       "🧠 Threat Intel", "claude-opus-4-6",             "anthropic"),
-        ("attack_planner",     "⚔️ Planner",      "claude-opus-4-6",             "anthropic"),
+        ("attack_planner",     "⚔️  Planner",     "claude-opus-4-6",             "anthropic"),
         ("payload_crafter",    "💻 Crafter",      "claude-sonnet-4-5-20250929",  "anthropic"),
         ("playbook_assembler", "📋 Assembler",    "claude-sonnet-4-5-20250929",  "anthropic"),
         ("validator",          "✅ Validator",    "claude-sonnet-4-5-20250929",  "anthropic"),
@@ -884,25 +890,59 @@ with st.sidebar:
     agent_models = {}
     if pipeline_mode == "multi_agent":
         with st.expander("🔧 Agent Models", expanded=False):
-            for akey, alabel, adefault, aprovider in _AGENT_SIDEBAR_DEFS:
-                opts = _AGENT_MODEL_OPTIONS[aprovider]
-                idx  = opts.index(adefault) if adefault in opts else 0
-                sel  = st.selectbox(alabel, opts, index=idx, key=f"am_{akey}")
-                agent_models[akey] = {"provider": aprovider, "model": sel}
+            st.markdown(
+                '<div style="font-size:0.7rem;color:#555;margin-bottom:0.6rem">'
+                'Provider → Model per agent. Ollama runs locally (no API key).</div>',
+                unsafe_allow_html=True,
+            )
+            for akey, alabel, adefault_model, adefault_prov in _AGENT_SIDEBAR_DEFS:
+                st.markdown(f"**{alabel}**")
+                c_prov, c_model = st.columns([1, 2])
+                with c_prov:
+                    prov_opts = list(_AGENT_MODEL_OPTIONS.keys())
+                    sel_prov  = st.selectbox(
+                        "Provider",
+                        prov_opts,
+                        index=prov_opts.index(adefault_prov),
+                        format_func=lambda p: _PROVIDER_ICONS[p],
+                        key=f"ap_{akey}",
+                        label_visibility="collapsed",
+                    )
+                with c_model:
+                    model_opts = _AGENT_MODEL_OPTIONS[sel_prov]
+                    # If default model is from a different provider, pick first
+                    def_idx = model_opts.index(adefault_model) if (
+                        sel_prov == adefault_prov and adefault_model in model_opts
+                    ) else 0
+                    sel_model = st.selectbox(
+                        "Model",
+                        model_opts,
+                        index=def_idx,
+                        key=f"am_{akey}",
+                        label_visibility="collapsed",
+                    )
+                agent_models[akey] = {"provider": sel_prov, "model": sel_model}
 
-    # API key hint for non-Ollama providers
-    if pipeline_mode == "multi_agent" or llm_provider == "anthropic":
-        api_key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
-        if api_key_set:
+    # ── API key status (dynamic: based on what's actually selected) ───
+    # Collect which providers are in use
+    _providers_in_use = set()
+    if pipeline_mode == "multi_agent":
+        _providers_in_use = {v["provider"] for v in agent_models.values()}
+    else:
+        _providers_in_use = {llm_provider}
+
+    if "anthropic" in _providers_in_use:
+        if os.environ.get("ANTHROPIC_API_KEY"):
             st.success("✅ ANTHROPIC_API_KEY set", icon=None)
         else:
-            st.warning("⚠️ Set `ANTHROPIC_API_KEY` env var")
-    if pipeline_mode == "classic" and llm_provider == "openai":
-        api_key_set = bool(os.environ.get("OPENAI_API_KEY"))
-        if api_key_set:
+            st.warning("⚠️ ANTHROPIC_API_KEY missing — add to .env")
+    if "openai" in _providers_in_use:
+        if os.environ.get("OPENAI_API_KEY"):
             st.success("✅ OPENAI_API_KEY set", icon=None)
         else:
-            st.warning("⚠️ Set `OPENAI_API_KEY` env var")
+            st.warning("⚠️ OPENAI_API_KEY missing — add to .env")
+    if "ollama" in _providers_in_use:
+        st.info("🖥️ Ollama: no key needed — run `ollama serve` locally", icon=None)
 
     st.markdown("---")
     analyze_btn = st.button("🚀 Analyze Report", disabled=uploaded_file is None)
