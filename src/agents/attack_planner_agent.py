@@ -90,8 +90,10 @@ class AttackPlannerAgent:
 
     name = "AttackPlannerAgent"
 
-    def __init__(self, config_path: str = "config.yaml"):
+    def __init__(self, config_path: str = "config.yaml", model_override: dict = None):
         agent_cfg   = _load_agent_config(config_path)
+        if model_override:
+            agent_cfg.update(model_override)
         provider    = agent_cfg.get("provider", "anthropic")
         model       = agent_cfg.get("model", "claude-opus-4-6")
         temperature = agent_cfg.get("temperature", 0.1)

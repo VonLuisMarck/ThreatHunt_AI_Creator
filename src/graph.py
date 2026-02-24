@@ -89,23 +89,26 @@ def route_after_validation(
 
 # ── Graph builder ─────────────────────────────────────────────────
 
-def build_graph(config_path: str = "config.yaml") -> StateGraph:
+def build_graph(config_path: str = "config.yaml", agent_overrides: dict = None) -> StateGraph:
     """
     Construye y compila el grafo LangGraph.
 
     Args:
-        config_path: Ruta a config.yaml (para inicializar los agentes)
+        config_path:     Ruta a config.yaml (para inicializar los agentes)
+        agent_overrides: Overrides de modelo por agente, e.g.
+                         {"recon": {"model": "claude-haiku-4-5-20251001", "provider": "anthropic"}}
 
     Returns:
         Grafo compilado listo para invocar.
     """
+    ov = agent_overrides or {}
     # Instanciar agentes
-    recon     = ReconAgent(config_path)
-    intel     = ThreatIntelAgent(config_path)
-    planner   = AttackPlannerAgent(config_path)
-    crafter   = PayloadCrafterAgent(config_path)
-    assembler = PlaybookAssemblerAgent(config_path)
-    validator = ValidatorAgent(config_path)
+    recon     = ReconAgent(config_path,     model_override=ov.get("recon"))
+    intel     = ThreatIntelAgent(config_path, model_override=ov.get("threat_intel"))
+    planner   = AttackPlannerAgent(config_path, model_override=ov.get("attack_planner"))
+    crafter   = PayloadCrafterAgent(config_path, model_override=ov.get("payload_crafter"))
+    assembler = PlaybookAssemblerAgent(config_path, model_override=ov.get("playbook_assembler"))
+    validator = ValidatorAgent(config_path,  model_override=ov.get("validator"))
 
     # Construir grafo
     graph = StateGraph(AgentState)
@@ -155,19 +158,21 @@ def build_graph(config_path: str = "config.yaml") -> StateGraph:
 # ── Public runner ─────────────────────────────────────────────────
 
 def run_pipeline(pdf_path: str, platform: str = "windows",
-                 config_path: str = "config.yaml") -> AgentState:
+                 config_path: str = "config.yaml",
+                 agent_overrides: dict = None) -> AgentState:
     """
     Ejecuta el pipeline multi-agente completo.
 
     Args:
-        pdf_path:    Ruta al PDF de threat intelligence
-        platform:    Plataforma por defecto ("windows" | "linux")
-        config_path: Ruta a config.yaml
+        pdf_path:        Ruta al PDF de threat intelligence
+        platform:        Plataforma por defecto ("windows" | "linux")
+        config_path:     Ruta a config.yaml
+        agent_overrides: Overrides de modelo por agente (opcional)
 
     Returns:
         Estado final con el playbook y todos los artefactos generados.
     """
-    graph = build_graph(config_path)
+    graph = build_graph(config_path, agent_overrides=agent_overrides)
 
     state = initial_state(pdf_path=pdf_path, platform=platform)
 

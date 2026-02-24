@@ -342,6 +342,39 @@ div[data-testid="stAlert"][kind="warning"] { background: #1a1000 !important; bor
 
 /* HR divider */
 hr { border-color: #1e1e28 !important; margin: 1rem 0 !important; }
+
+/* ═══════════════════════════════════════════════════════════════
+   AGENT GRAPH
+   ═══════════════════════════════════════════════════════════════ */
+.agent-detail-box {
+    background: #090912;
+    border: 1px solid #1a1a28;
+    border-left: 3px solid #CC0000;
+    border-radius: 8px;
+    padding: 1rem 1.2rem;
+    font-family: 'JetBrains Mono', 'Fira Code', 'Consolas', monospace;
+    font-size: 0.79rem;
+    color: #b0b0c8;
+    white-space: pre-wrap;
+    line-height: 1.7;
+    max-height: 300px;
+    overflow-y: auto;
+}
+.graph-section {
+    background: #0a0a12;
+    border: 1px solid #1a1a28;
+    border-radius: 12px;
+    padding: 1.2rem 1.4rem 1rem;
+    margin-bottom: 1.2rem;
+}
+.graph-section-title {
+    font-size: 0.68rem;
+    font-weight: 700;
+    color: #cc3333;
+    text-transform: uppercase;
+    letter-spacing: 2px;
+    margin-bottom: 0.8rem;
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -384,6 +417,176 @@ def risk_badge(risk: str) -> str:
 def tactic_pill(tactic: str) -> str:
     color = TACTIC_COLORS.get(tactic, "#555")
     return f'<span class="tactic-pill" style="background:{color}22;color:{color};border:1px solid {color}">{tactic}</span>'
+
+
+# ── Multi-agent graph helpers ─────────────────────────────────────
+
+_GRAPH_NODES = [
+    ("recon",              "🔍", "Recon",     "Haiku",  75),
+    ("threat_intel",       "🧠", "Intel",      "Opus",   220),
+    ("attack_planner",     "⚔️",  "Planner",    "Opus",   365),
+    ("payload_crafter",    "💻", "Crafter",    "Sonnet", 510),
+    ("playbook_assembler", "📋", "Assembler",  "Sonnet", 655),
+    ("validator",          "✅", "Validator",  "Sonnet", 800),
+]
+_KEY_TO_AGENT_NAME = {
+    "recon": "ReconAgent", "threat_intel": "ThreatIntelAgent",
+    "attack_planner": "AttackPlannerAgent", "payload_crafter": "PayloadCrafterAgent",
+    "playbook_assembler": "PlaybookAssemblerAgent", "validator": "ValidatorAgent",
+}
+
+
+def _agent_graph_svg(statuses: dict = None, selected: str = None) -> str:
+    """
+    Renders the 6-agent pipeline as an SVG graph.
+
+    statuses: dict  {agent_key: "idle"|"done"|"active"|"error"|"skipped"}
+    selected: str   agent_key of the currently selected node (highlighted)
+    """
+    statuses = statuses or {}
+    S = {
+        "idle":    ("#111118", "#2a2a38", "#555566"),
+        "done":    ("#0a1a0a", "#2a8a2a", "#88cc88"),
+        "active":  ("#1a1408", "#cc8800", "#ccaa44"),
+        "error":   ("#1a0505", "#cc3030", "#cc8080"),
+        "skipped": ("#0d0d1a", "#303060", "#606080"),
+    }
+    W, H, NW, NH, CY = 920, 215, 110, 65, 104
+
+    def node_svg(key, icon, name, model, cx):
+        status = statuses.get(key, "idle")
+        fill, stroke, tc = S.get(status, S["idle"])
+        sw = "2.5" if selected == key else "1.5"
+        if selected == key:
+            stroke, fill = "#CC0000", ("#1a0505" if fill == "#111118" else fill)
+        x, y = cx - NW // 2, CY - NH // 2
+        dot = ""
+        if status == "done":
+            dot = f'<circle cx="{cx + NW//2 - 8}" cy="{y+8}" r="4" fill="#2a8a2a"/>'
+        elif status == "active":
+            dot = f'<circle cx="{cx + NW//2 - 8}" cy="{y+8}" r="4" fill="#cc8800"/>'
+        elif status == "error":
+            dot = f'<circle cx="{cx + NW//2 - 8}" cy="{y+8}" r="4" fill="#cc3030"/>'
+        return (
+            f'<rect x="{x+2}" y="{y+2}" width="{NW}" height="{NH}" rx="8" fill="rgba(0,0,0,0.45)"/>'
+            f'<rect x="{x}" y="{y}" width="{NW}" height="{NH}" rx="8" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"/>'
+            f'{dot}'
+            f'<text x="{cx}" y="{y+19}" text-anchor="middle" font-size="15">{icon}</text>'
+            f'<text x="{cx}" y="{y+33}" text-anchor="middle" font-size="10" fill="{tc}" font-weight="bold" font-family="sans-serif">{name}</text>'
+            f'<text x="{cx}" y="{y+47}" text-anchor="middle" font-size="8.5" fill="#4a4a5a" font-family="monospace">{model}</text>'
+        )
+
+    arrows = [(130,165), (275,310), (420,455), (565,600), (710,745)]
+    p = [
+        f'<svg viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg" '
+        f'style="width:100%;background:#0a0a12;border-radius:10px;display:block">',
+        # Arrow markers
+        '<defs>'
+        '<marker id="ah"  markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#3a3a4a"/></marker>'
+        '<marker id="ahl" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#5a5a2a"/></marker>'
+        '<marker id="ahr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#2a3a5a"/></marker>'
+        '</defs>',
+        # Main flow arrows
+        *[f'<line x1="{x1}" y1="{CY}" x2="{x2}" y2="{CY}" stroke="#2e2e3e" stroke-width="1.5" marker-end="url(#ah)"/>'
+          for x1, x2 in arrows],
+        # intel→recon clarification (back arrow, above)
+        f'<path d="M 220,{CY-NH//2} C 220,18 75,18 75,{CY-NH//2}" fill="none" stroke="#4a4a2a" stroke-width="1.3" stroke-dasharray="5,3" marker-end="url(#ahl)"/>',
+        f'<text x="148" y="13" fill="#5a5a2a" font-size="8.5" font-family="monospace" text-anchor="middle">clarification?</text>',
+        # validator→planner retry (back arrow, below)
+        f'<path d="M 800,{CY+NH//2} C 800,190 365,190 365,{CY+NH//2}" fill="none" stroke="#2a3a5a" stroke-width="1.3" stroke-dasharray="5,3" marker-end="url(#ahr)"/>',
+        f'<text x="585" y="205" fill="#2a3a5a" font-size="8.5" font-family="monospace" text-anchor="middle">retry on validation issues</text>',
+        # intel→END (not demonstrable)
+        f'<line x1="220" y1="{CY+NH//2}" x2="220" y2="167" stroke="#2e2e3e" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#ah)"/>',
+        f'<text x="220" y="178" fill="#3a3a4a" font-size="8" font-family="monospace" text-anchor="middle">not demo</text>',
+        # validator→END
+        f'<line x1="856" y1="{CY}" x2="882" y2="{CY}" stroke="#2e2e3e" stroke-width="1.2" marker-end="url(#ah)"/>',
+        f'<text x="898" y="{CY+4}" fill="#3a3a4a" font-size="8" font-family="monospace">END</text>',
+        # Nodes
+        *[node_svg(k, ic, nm, md, cx) for k, ic, nm, md, cx in _GRAPH_NODES],
+        '</svg>',
+    ]
+    return '\n'.join(p)
+
+
+def _agent_detail_panel(key: str, res: dict):
+    """Renders the detail panel for a selected agent node."""
+    agent_name = _KEY_TO_AGENT_NAME.get(key, key)
+    icon  = next((ic for k, ic, *_ in _GRAPH_NODES if k == key), "🤖")
+    model = next((md for k, _, __, md, *_ in _GRAPH_NODES if k == key), "")
+
+    msgs = res.get("_agent_messages", [])
+    agent_msg = next((m for m in reversed(msgs) if m["agent"] == agent_name), None)
+
+    st.markdown(
+        f'<div class="section-title" style="margin-top:0.8rem">'
+        f'{icon} {agent_name}'
+        f'<span style="color:#444;font-size:0.7rem;font-weight:400;margin-left:6px">({model})</span>'
+        f'</div>',
+        unsafe_allow_html=True,
+    )
+
+    col_msg, col_data = st.columns([1, 1])
+
+    with col_msg:
+        st.markdown('<div style="font-size:0.75rem;color:#666;margin-bottom:0.3rem">OUTPUT MESSAGE</div>', unsafe_allow_html=True)
+        if agent_msg:
+            st.markdown(f'<div class="agent-detail-box">{agent_msg["content"]}</div>', unsafe_allow_html=True)
+        else:
+            st.caption("No message recorded (agent may have been skipped)")
+
+    with col_data:
+        st.markdown('<div style="font-size:0.75rem;color:#666;margin-bottom:0.3rem">OUTPUTS</div>', unsafe_allow_html=True)
+        if key == "recon":
+            iocs = res.get("iocs", {})
+            ttps = res.get("ttps", [])
+            st.markdown(f"**IOCs:** {sum(len(v) for v in iocs.values())} total")
+            for k, v in iocs.items():
+                if v: st.markdown(f"&nbsp;&nbsp;`{k}`: {len(v)}", unsafe_allow_html=True)
+            st.markdown(f"**TTPs:** {len(ttps)}")
+            for t in ttps[:6]:
+                st.markdown(f"&nbsp;&nbsp;`{t.get('id')}` {t.get('name','')[:35]}", unsafe_allow_html=True)
+            if len(ttps) > 6: st.caption(f"  +{len(ttps)-6} more")
+
+        elif key == "threat_intel":
+            a = res.get("analysis", {})
+            if a:
+                for k, v in [("Actor", a.get("threat_actor","?")), ("Type", a.get("threat_actor_type","?")),
+                              ("Campaign", a.get("campaign_name","?")), ("Demonstrable", "✅ Yes" if a.get("demonstrable") else "❌ No"),
+                              ("Risk", a.get("demo_risk","?")), ("Confidence", a.get("confidence_level","?"))]:
+                    st.markdown(f"**{k}:** {v}")
+
+        elif key == "attack_planner":
+            for s in res.get("attack_sequence", []):
+                st.markdown(f"`{s.get('technique_id')}` {s.get('description','')[:55]}")
+
+        elif key == "payload_crafter":
+            snips = res.get("snippets", [])
+            lib = sum(1 for s in snips if s.get("source") == "static_library")
+            st.markdown(f"**{len(snips)} snippets** — 📚 {lib} library / 🧠 {len(snips)-lib} LLM")
+            for s in snips:
+                src_ico = "📚" if s.get("source") == "static_library" else "🧠"
+                st.markdown(f"{src_ico} `{s.get('technique_id')}` {s.get('name','')[:40]}")
+
+        elif key == "playbook_assembler":
+            pb = res.get("playbook", {})
+            if pb:
+                evs = pb.get("events", [])
+                attack_ev = [e for e in evs if "cleanup" not in e.get("event_id","")]
+                st.markdown(f"**ID:** `{pb.get('playbook_id','N/A')}`")
+                st.markdown(f"**Attack events:** {len(attack_ev)}")
+                st.markdown(f"**Cleanup events:** {len(evs)-len(attack_ev)}")
+                for a in pb.get("mandatory_agents", []):
+                    st.markdown(f"&nbsp;&nbsp;`{a['agent_id']}` ({a['agent_type']})", unsafe_allow_html=True)
+
+        elif key == "validator":
+            val = res.get("_validation", {})
+            retries = res.get("_retry_count", 0)
+            st.markdown(f"**Result:** {'✅ Valid' if val.get('valid') else '⚠️ Issues found'}")
+            st.markdown(f"**Retries used:** {retries}")
+            for issue in val.get("issues", []):
+                st.markdown(f"&nbsp;&nbsp;✗ {issue}", unsafe_allow_html=True)
+            if val.get("feedback"):
+                st.caption(f"Feedback: {val['feedback'][:120]}")
 
 
 def run_pipeline(pdf_bytes: bytes, model: str, platform: str, provider: str = "ollama") -> dict:
@@ -519,11 +722,15 @@ def run_pipeline(pdf_bytes: bytes, model: str, platform: str, provider: str = "o
     yield "final", results
 
 
-def run_graph_pipeline(pdf_bytes: bytes, platform: str, config_path: str = "config.yaml"):
+def run_graph_pipeline(pdf_bytes: bytes, platform: str, config_path: str = "config.yaml",
+                       agent_models: dict = None):
     """
     Multi-agent LangGraph pipeline.
     Yields the same (kind, step, msg) event format as run_pipeline() for
     UI compatibility, then ("final", results_dict) at the end.
+
+    agent_models: dict  {"recon": {"provider": "anthropic", "model": "claude-..."}, ...}
+                        Overrides from the sidebar per-agent config.
     """
     from src.graph import build_graph
     from src.agents.state import initial_state as graph_initial_state
@@ -542,7 +749,7 @@ def run_graph_pipeline(pdf_bytes: bytes, platform: str, config_path: str = "conf
         tmp_path = tmp.name
 
     try:
-        graph = build_graph(config_path)
+        graph = build_graph(config_path, agent_overrides=agent_models or {})
         state = graph_initial_state(pdf_path=tmp_path, platform=platform)
     except Exception as e:
         yield "error", 0, f"Failed to build multi-agent graph: {e}"
@@ -657,8 +864,31 @@ with st.sidebar:
             index=0,
         )
 
+    # Per-agent model configuration (multi-agent mode only)
+    _ALL_CLAUDE = ["claude-opus-4-6", "claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"]
+    _ALL_GPT    = ["gpt-4o", "gpt-4-turbo", "gpt-4"]
+    _ALL_OLLAMA = ["llama3", "llama3.1:70b", "mixtral:8x7b", "mistral"]
+    _AGENT_MODEL_OPTIONS = {
+        "anthropic": _ALL_CLAUDE,
+        "openai":    _ALL_GPT,
+        "ollama":    _ALL_OLLAMA,
+    }
+    _AGENT_SIDEBAR_DEFS = [
+        ("recon",              "🔍 Recon",       "claude-haiku-4-5-20251001",   "anthropic"),
+        ("threat_intel",       "🧠 Threat Intel", "claude-opus-4-6",             "anthropic"),
+        ("attack_planner",     "⚔️ Planner",      "claude-opus-4-6",             "anthropic"),
+        ("payload_crafter",    "💻 Crafter",      "claude-sonnet-4-5-20250929",  "anthropic"),
+        ("playbook_assembler", "📋 Assembler",    "claude-sonnet-4-5-20250929",  "anthropic"),
+        ("validator",          "✅ Validator",    "claude-sonnet-4-5-20250929",  "anthropic"),
+    ]
+    agent_models = {}
     if pipeline_mode == "multi_agent":
-        st.info("🤖 Multi-Agent mode uses models from `config.yaml → agents:`", icon=None)
+        with st.expander("🔧 Agent Models", expanded=False):
+            for akey, alabel, adefault, aprovider in _AGENT_SIDEBAR_DEFS:
+                opts = _AGENT_MODEL_OPTIONS[aprovider]
+                idx  = opts.index(adefault) if adefault in opts else 0
+                sel  = st.selectbox(alabel, opts, index=idx, key=f"am_{akey}")
+                agent_models[akey] = {"provider": aprovider, "model": sel}
 
     # API key hint for non-Ollama providers
     if pipeline_mode == "multi_agent" or llm_provider == "anthropic":
@@ -798,7 +1028,7 @@ if analyze_btn and uploaded_file:
         progress_bar = st.progress(0, text="Starting analysis...")
 
     pipeline_fn = (
-        lambda: run_graph_pipeline(pdf_bytes, platform)
+        lambda: run_graph_pipeline(pdf_bytes, platform, agent_models=agent_models)
         if pipeline_mode == "multi_agent"
         else run_pipeline(pdf_bytes, llm_model, platform, provider=llm_provider)
     )
@@ -891,8 +1121,62 @@ if "results" in st.session_state:
     else:
         st.error(f"❌ **Not demonstrable** — {analysis.get('reasoning', '')[:120]}")
 
-    # ── Tabs ─────────────────────────────────────────────────────
+    # ── Agent Graph (multi-agent mode only) ───────────────────────
     _is_multiagent = res.get("_pipeline") == "multi_agent"
+
+    if _is_multiagent:
+        agent_messages_graph = res.get("_agent_messages", [])
+
+        # Compute which agents completed from the messages log
+        _completed_names = {m["agent"] for m in agent_messages_graph}
+        _name_to_key = {v: k for k, v in _KEY_TO_AGENT_NAME.items()}
+        _statuses = {_name_to_key[n]: "done" for n in _completed_names if n in _name_to_key}
+
+        # Selected agent (persisted in session_state)
+        if "selected_agent_view" not in st.session_state:
+            st.session_state["selected_agent_view"] = None
+
+        st.markdown('<div class="graph-section">', unsafe_allow_html=True)
+        st.markdown('<div class="graph-section-title">Pipeline — Agent Interaction Graph</div>', unsafe_allow_html=True)
+
+        # SVG graph (visual only)
+        svg_html = _agent_graph_svg(
+            statuses=_statuses,
+            selected=st.session_state["selected_agent_view"],
+        )
+        st.markdown(svg_html, unsafe_allow_html=True)
+
+        # Clickable agent selector row (maps to node positions)
+        st.markdown("<div style='margin-top:0.6rem'>", unsafe_allow_html=True)
+        _btn_cols = st.columns(6)
+        _btn_keys = [k for k, *_ in _GRAPH_NODES]
+        _btn_icons = {k: ic for k, ic, *_ in _GRAPH_NODES}
+        _btn_names = {k: nm for k, _, nm, *_ in _GRAPH_NODES}
+        _btn_models = {k: md for k, _, __, md, *_ in _GRAPH_NODES}
+
+        for col, key in zip(_btn_cols, _btn_keys):
+            with col:
+                is_done = _statuses.get(key) == "done"
+                is_sel  = st.session_state["selected_agent_view"] == key
+                status_dot = "🟢 " if is_done else ""
+                lbl = f"{status_dot}{_btn_icons[key]} {_btn_names[key]}"
+                btn_type = "primary" if is_sel else "secondary"
+                if st.button(lbl, key=f"gnode_{key}", use_container_width=True, type=btn_type):
+                    new_val = None if is_sel else key   # toggle off if already selected
+                    st.session_state["selected_agent_view"] = new_val
+                    st.rerun()
+
+        st.markdown("</div>", unsafe_allow_html=True)
+
+        # Agent detail panel (appears when a node is clicked)
+        _sel = st.session_state.get("selected_agent_view")
+        if _sel:
+            st.markdown("<hr>", unsafe_allow_html=True)
+            _agent_detail_panel(_sel, res)
+
+        st.markdown('</div>', unsafe_allow_html=True)  # end .graph-section
+
+    # ── Tabs ─────────────────────────────────────────────────────
     _tab_names = [
         "📄 PDF Analysis",
         "🔍 IOCs",
