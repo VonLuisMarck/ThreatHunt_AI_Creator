@@ -519,6 +519,77 @@ def run_pipeline(pdf_bytes: bytes, model: str, platform: str, provider: str = "o
     yield "final", results
 
 
+def run_graph_pipeline(pdf_bytes: bytes, platform: str, config_path: str = "config.yaml"):
+    """
+    Multi-agent LangGraph pipeline.
+    Yields the same (kind, step, msg) event format as run_pipeline() for
+    UI compatibility, then ("final", results_dict) at the end.
+    """
+    from src.graph import build_graph
+    from src.agents.state import initial_state as graph_initial_state
+
+    _AGENT_INFO = {
+        "recon":              (1, "🔍 Recon Agent",          "Extracting IOCs, TTPs, writing briefing"),
+        "threat_intel":       (2, "🧠 Threat Intel Agent",   "Deep analysis — Claude Opus"),
+        "attack_planner":     (3, "⚔️ Attack Planner",       "Designing attack sequence — Claude Opus"),
+        "payload_crafter":    (4, "💻 Payload Crafter",      "Generating emulation snippets — Claude Sonnet"),
+        "playbook_assembler": (5, "📋 Playbook Assembler",   "Assembling Shadow-Replay JSON"),
+        "validator":          (6, "✅ Validator",             "Validating playbook"),
+    }
+
+    with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
+        tmp.write(pdf_bytes)
+        tmp_path = tmp.name
+
+    try:
+        graph = build_graph(config_path)
+        state = graph_initial_state(pdf_path=tmp_path, platform=platform)
+    except Exception as e:
+        yield "error", 0, f"Failed to build multi-agent graph: {e}"
+        yield "final", {}
+        return
+
+    yield "step", 1, "Launching multi-agent pipeline (6 specialized agents)..."
+
+    accumulated = dict(state)
+    last_step = 0
+
+    try:
+        for chunk in graph.stream(dict(state), stream_mode="updates"):
+            for node_name, partial_update in chunk.items():
+                if node_name == "__end__":
+                    continue
+                # Merge partial update into accumulated state
+                for k, v in partial_update.items():
+                    accumulated[k] = v
+
+                step, label, desc = _AGENT_INFO.get(node_name, (last_step, f"🤖 {node_name}", "processing"))
+                last_step = step
+                yield "done", step, f"{label}: {desc} — complete"
+    except Exception as e:
+        yield "error", last_step, f"Multi-agent pipeline error: {e}"
+
+    # ── Normalize to the same results dict shape as run_pipeline() ──
+    final_results = {
+        "content":         accumulated.get("content", {}),
+        "iocs":            accumulated.get("iocs", {}),
+        "ttps":            accumulated.get("ttps", []),
+        "analysis":        accumulated.get("analysis", {}),
+        "attack_sequence": accumulated.get("attack_sequence", []),
+        "snippets":        accumulated.get("snippets", []),
+        "playbook":        accumulated.get("playbook", {}),
+        "summary":         accumulated.get("narrative_summary", ""),
+        "demo_brief_md":   "",
+        "errors":          {},
+        # Multi-agent extras (used in Agent Log tab)
+        "_agent_messages": accumulated.get("messages", []),
+        "_validation":     accumulated.get("validation", {}),
+        "_retry_count":    max(0, accumulated.get("retry_count", 1) - 1),
+        "_pipeline":       "multi_agent",
+    }
+    yield "final", final_results
+
+
 # ─────────────────────────────────────────────────────────────────
 #  Sidebar
 # ─────────────────────────────────────────────────────────────────
@@ -561,12 +632,23 @@ with st.sidebar:
         index=0,
     )
 
+    # Pipeline mode
+    pipeline_mode = st.selectbox(
+        "Pipeline Mode",
+        ["classic", "multi_agent"],
+        format_func=lambda m: "⚙️  Classic (single model)" if m == "classic" else "🤖  Multi-Agent (specialized)",
+        index=0,
+        help="Classic: single LLM, 6 steps.  Multi-Agent: 6 specialized agents with per-task models (requires Anthropic API).",
+    )
+
     col1, col2 = st.columns(2)
     with col1:
         llm_model = st.selectbox(
             "Model",
             _PROVIDER_MODELS[llm_provider],
             index=0,
+            disabled=pipeline_mode == "multi_agent",
+            help="Ignored in Multi-Agent mode — each agent uses its own model from config.yaml",
         )
     with col2:
         platform = st.selectbox(
@@ -575,14 +657,17 @@ with st.sidebar:
             index=0,
         )
 
+    if pipeline_mode == "multi_agent":
+        st.info("🤖 Multi-Agent mode uses models from `config.yaml → agents:`", icon=None)
+
     # API key hint for non-Ollama providers
-    if llm_provider == "anthropic":
+    if pipeline_mode == "multi_agent" or llm_provider == "anthropic":
         api_key_set = bool(os.environ.get("ANTHROPIC_API_KEY"))
         if api_key_set:
             st.success("✅ ANTHROPIC_API_KEY set", icon=None)
         else:
             st.warning("⚠️ Set `ANTHROPIC_API_KEY` env var")
-    elif llm_provider == "openai":
+    if pipeline_mode == "classic" and llm_provider == "openai":
         api_key_set = bool(os.environ.get("OPENAI_API_KEY"))
         if api_key_set:
             st.success("✅ OPENAI_API_KEY set", icon=None)
@@ -593,17 +678,30 @@ with st.sidebar:
     analyze_btn = st.button("🚀 Analyze Report", disabled=uploaded_file is None)
 
     st.markdown("---")
-    st.markdown("""
-    <div style="font-size:0.75rem;color:#555;line-height:1.6">
-    <b style="color:#888">Pipeline steps:</b><br>
-    1️⃣ PDF Structural Analysis<br>
-    2️⃣ IOC Extraction<br>
-    3️⃣ MITRE ATT&CK Mapping<br>
-    4️⃣ LLM Deep Analysis<br>
-    5️⃣ Emulation Code Generation<br>
-    6️⃣ Playbook + Summary
-    </div>
-    """, unsafe_allow_html=True)
+    if pipeline_mode == "classic":
+        st.markdown("""
+        <div style="font-size:0.75rem;color:#555;line-height:1.6">
+        <b style="color:#888">Classic pipeline:</b><br>
+        1️⃣ PDF Structural Analysis<br>
+        2️⃣ IOC Extraction<br>
+        3️⃣ MITRE ATT&CK Mapping<br>
+        4️⃣ LLM Deep Analysis<br>
+        5️⃣ Emulation Code Generation<br>
+        6️⃣ Playbook + Summary
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown("""
+        <div style="font-size:0.75rem;color:#555;line-height:1.6">
+        <b style="color:#888">Multi-Agent pipeline:</b><br>
+        🔍 Recon Agent <span style="color:#444">(Haiku)</span><br>
+        🧠 Threat Intel Agent <span style="color:#444">(Opus)</span><br>
+        ⚔️ Attack Planner <span style="color:#444">(Opus)</span><br>
+        💻 Payload Crafter <span style="color:#444">(Sonnet)</span><br>
+        📋 Playbook Assembler <span style="color:#444">(Sonnet)</span><br>
+        ✅ Validator + retry loop
+        </div>
+        """, unsafe_allow_html=True)
 
     st.markdown("---")
     _req_line = {
@@ -682,35 +780,43 @@ if analyze_btn and uploaded_file:
     progress_placeholder = st.empty()
     log_placeholder = st.empty()
 
-    step_labels = {
-        1: "PDF Analysis",
-        2: "IOC Extraction",
-        3: "TTP Mapping",
-        4: "LLM Analysis",
-        5: "Emulation Code",
-        6: "Playbook",
+    _classic_labels = {
+        1: "PDF Analysis", 2: "IOC Extraction", 3: "TTP Mapping",
+        4: "LLM Analysis", 5: "Emulation Code", 6: "Playbook",
     }
+    _agent_labels = {
+        1: "Recon Agent", 2: "Threat Intel", 3: "Attack Planner",
+        4: "Payload Crafter", 5: "Playbook Assembler", 6: "Validator",
+    }
+    step_labels = _agent_labels if pipeline_mode == "multi_agent" else _classic_labels
+    total_steps = 6
 
     logs = []
     final_results = None
 
     with progress_placeholder.container():
         progress_bar = st.progress(0, text="Starting analysis...")
-        status_container = st.empty()
 
-    for event in run_pipeline(pdf_bytes, llm_model, platform, provider=llm_provider):
+    pipeline_fn = (
+        lambda: run_graph_pipeline(pdf_bytes, platform)
+        if pipeline_mode == "multi_agent"
+        else run_pipeline(pdf_bytes, llm_model, platform, provider=llm_provider)
+    )
+
+    for event in pipeline_fn():
         kind = event[0]
 
         if kind == "step":
             _, step_num, msg = event
-            pct = int(((step_num - 1) / 6) * 100)
-            progress_bar.progress(pct, text=f"Step {step_num}/6 — {step_labels[step_num]}: {msg}")
+            label = step_labels.get(step_num, f"Step {step_num}")
+            pct = max(0, int(((step_num - 1) / total_steps) * 100))
+            progress_bar.progress(pct, text=f"{label}: {msg}")
             logs.append(f"⏳ {msg}")
 
-        elif kind == "done":
+        elif kind in ("done", "agent_done"):
             _, step_num, msg = event
-            pct = int((step_num / 6) * 100)
-            progress_bar.progress(pct, text=f"Step {step_num}/6 — ✓ {msg}")
+            pct = int((step_num / total_steps) * 100)
+            progress_bar.progress(pct, text=f"✓ {msg}")
             logs.append(f"✅ {msg}")
 
         elif kind == "warn":
@@ -730,6 +836,7 @@ if analyze_btn and uploaded_file:
     log_placeholder.empty()
 
     if final_results:
+        final_results["_pipeline"] = final_results.get("_pipeline", "classic")
         st.session_state["results"] = final_results
         st.session_state["filename"] = uploaded_file.name
         st.rerun()
@@ -785,14 +892,18 @@ if "results" in st.session_state:
         st.error(f"❌ **Not demonstrable** — {analysis.get('reasoning', '')[:120]}")
 
     # ── Tabs ─────────────────────────────────────────────────────
-    tabs = st.tabs([
+    _is_multiagent = res.get("_pipeline") == "multi_agent"
+    _tab_names = [
         "📄 PDF Analysis",
         "🔍 IOCs",
         "🗺️ TTPs",
         "🧠 Threat Analysis",
         "💻 Emulation Code",
         "📋 Playbook",
-    ])
+    ]
+    if _is_multiagent:
+        _tab_names.append("🤖 Agent Log")
+    tabs = st.tabs(_tab_names)
 
     # ════════════════════════════════════════════════════════════
     # TAB 1 — PDF Analysis
@@ -1196,3 +1307,74 @@ if "results" in st.session_state:
         if playbook:
             with st.expander("🔧 Raw Playbook JSON (runner)"):
                 st.json(playbook)
+
+    # ════════════════════════════════════════════════════════════
+    # TAB 7 — Agent Log (multi-agent mode only)
+    # ════════════════════════════════════════════════════════════
+    if _is_multiagent:
+        with tabs[6]:
+            agent_messages = res.get("_agent_messages", [])
+            validation     = res.get("_validation", {})
+            retry_count    = res.get("_retry_count", 0)
+
+            # ── Validation summary ────────────────────────────
+            v_col1, v_col2, v_col3 = st.columns(3)
+            with v_col1:
+                v_valid = validation.get("valid", False)
+                st.markdown(metric_card(
+                    "✓ VALID" if v_valid else "⚠ ISSUES",
+                    "Validation"
+                ), unsafe_allow_html=True)
+            with v_col2:
+                st.markdown(metric_card(retry_count, "Retries"), unsafe_allow_html=True)
+            with v_col3:
+                st.markdown(metric_card(len(agent_messages), "Agent Messages"), unsafe_allow_html=True)
+
+            if validation.get("issues"):
+                st.markdown('<div class="section-title" style="margin-top:1rem">Validation Issues</div>', unsafe_allow_html=True)
+                for issue in validation["issues"]:
+                    st.markdown(f"  ✗ {issue}")
+            elif v_valid:
+                st.success("Playbook passed all validation checks (structural + semantic).")
+
+            # ── Agent conversation log ────────────────────────
+            st.markdown('<div class="section-title" style="margin-top:1.5rem">Agent Conversation Log</div>', unsafe_allow_html=True)
+
+            _AGENT_ICONS = {
+                "ReconAgent":              "🔍",
+                "ThreatIntelAgent":        "🧠",
+                "AttackPlannerAgent":      "⚔️",
+                "PayloadCrafterAgent":     "💻",
+                "PlaybookAssemblerAgent":  "📋",
+                "ValidatorAgent":          "✅",
+            }
+            _AGENT_MODELS = {
+                "ReconAgent":              "Haiku",
+                "ThreatIntelAgent":        "Opus",
+                "AttackPlannerAgent":      "Opus",
+                "PayloadCrafterAgent":     "Sonnet",
+                "PlaybookAssemblerAgent":  "Sonnet",
+                "ValidatorAgent":          "Sonnet",
+            }
+
+            if not agent_messages:
+                st.info("No agent messages recorded.")
+            else:
+                for i, msg in enumerate(agent_messages):
+                    agent  = msg.get("agent", "Unknown")
+                    ts     = msg.get("timestamp", "")[:19].replace("T", " ")
+                    icon   = _AGENT_ICONS.get(agent, "🤖")
+                    model  = _AGENT_MODELS.get(agent, "")
+                    model_badge = f' <span style="color:#555;font-size:0.7rem">({model})</span>' if model else ""
+
+                    with st.expander(
+                        f"{icon} **{agent}**{model_badge}  —  {ts}",
+                        expanded=(i == 0),
+                    ):
+                        st.markdown(
+                            f'<div style="font-family:monospace;font-size:0.82rem;'
+                            f'background:#0a0a12;border:1px solid #1a1a28;border-radius:8px;'
+                            f'padding:1rem;white-space:pre-wrap;color:#c0c0d0;line-height:1.6">'
+                            f'{msg["content"]}</div>',
+                            unsafe_allow_html=True,
+                        )
