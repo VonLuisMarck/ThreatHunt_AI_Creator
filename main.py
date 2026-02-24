@@ -2,6 +2,10 @@
 """
 ThreatHunt AI Creator - Advanced Threat Report Analyzer
 Converts threat intelligence PDFs into executable attack simulation playbooks.
+
+Usage:
+  python main.py <pdf>           Classic single-LLM pipeline
+  python main.py <pdf> --graph   Multi-agent LangGraph pipeline (specialized models)
 """
 import yaml
 import json
@@ -371,15 +375,69 @@ def main(pdf_path: str):
     print()
 
 
+def main_graph(pdf_path: str):
+    """Pipeline multi-agente LangGraph (modelos especializados por tarea)."""
+    from src.graph import run_pipeline
+
+    config  = load_config()
+    platform = config.get("demo", {}).get("platform", "windows")
+    output_dir = Path(config.get("output", {}).get("playbook_dir", "playbooks"))
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    final_state = run_pipeline(pdf_path, platform=platform)
+
+    playbook = final_state.get("playbook", {})
+    snippets = final_state.get("snippets", [])
+
+    if not playbook:
+        print("\n⚠️  No playbook generated.")
+        analysis = final_state.get("analysis", {})
+        if analysis:
+            print(f"   Reason: {analysis.get('reasoning', 'Unknown')}")
+        return
+
+    # Save outputs
+    output_file = output_dir / f"{playbook['playbook_id']}.json"
+    with open(output_file, "w") as f:
+        json.dump(playbook, f, indent=2)
+
+    snippets_file = output_dir / f"{playbook['playbook_id']}_emulation_snippets.json"
+    with open(snippets_file, "w") as f:
+        json.dump(snippets, f, indent=2)
+
+    validation = final_state.get("validation", {})
+    banner("✅  MULTI-AGENT PIPELINE COMPLETE")
+    print(f"  Playbook:   {output_file}")
+    print(f"  Snippets:   {snippets_file}")
+    print(f"  Events:     {len(playbook.get('events', []))}")
+    print(f"  Agents:     {[a['agent_id'] + '(' + a['agent_type'] + ')' for a in playbook.get('mandatory_agents', [])]}")
+    print(f"  Validation: {'PASSED ✓' if validation.get('valid') else 'accepted with warnings'}")
+    print(f"  Retries:    {final_state.get('retry_count', 0) - 1}")
+    print(f"  Agent msgs: {len(final_state.get('messages', []))}")
+    print()
+
+
 if __name__ == "__main__":
-    if len(sys.argv) < 2:
-        print("Usage: python main.py <path_to_pdf_report>")
-        print("Example: python main.py reports/crowdstrike_report.pdf")
+    args = sys.argv[1:]
+
+    if not args or args[0] in ("-h", "--help"):
+        print("Usage: python main.py <path_to_pdf_report> [--graph]")
+        print()
+        print("  --graph   Use multi-agent LangGraph pipeline (specialized models per task)")
+        print()
+        print("Example:")
+        print("  python main.py reports/crowdstrike_report.pdf")
+        print("  python main.py reports/crowdstrike_report.pdf --graph")
         sys.exit(1)
 
-    pdf_path = sys.argv[1]
+    pdf_path   = args[0]
+    use_graph  = "--graph" in args
+
     if not Path(pdf_path).exists():
         print(f"Error: File not found: {pdf_path}")
         sys.exit(1)
 
-    main(pdf_path)
+    if use_graph:
+        main_graph(pdf_path)
+    else:
+        main(pdf_path)

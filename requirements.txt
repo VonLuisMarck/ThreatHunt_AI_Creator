@@ -18,3 +18,5 @@ xlsxwriter
 langchain-anthropic>=0.3.0
 # OpenAI API:
 langchain-openai>=0.3.0
+# ── Multi-agent orchestration ─────────────────────────────────────
+langgraph>=0.2.0

@@ -1,4 +1,5 @@
 llm:
+  # Usado por el pipeline clásico (main.py sin --graph)
   # Provider: ollama | anthropic | openai
   # ollama    → local model, no cost, lower quality (good for dev)
   # anthropic → Claude API, best quality (export ANTHROPIC_API_KEY=sk-ant-...)
@@ -10,6 +11,53 @@ llm:
   #   ollama:    llama3.1:70b, mixtral:8x7b
   #   anthropic: claude-opus-4-6, claude-sonnet-4-5-20250929
   #   openai:    gpt-4o, gpt-4-turbo
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MULTI-AGENT PIPELINE (main.py --graph)
+# Cada agente usa el modelo más adecuado para su tarea.
+# Si un agente no está configurado aquí, usa las claves de `llm` como fallback.
+# ─────────────────────────────────────────────────────────────────────────────
+agents:
+  recon:
+    # Extracción determinista (PDF/IOC/TTP) + redacción de briefing
+    # Haiku: rápido y barato — el trabajo pesado es regex, no LLM
+    provider: anthropic
+    model: claude-haiku-4-5-20251001
+    temperature: 0.1
+
+  threat_intel:
+    # Análisis profundo: actor, campaña, demonstrability, CrowdStrike products
+    # Opus: máximo razonamiento y dominio de threat intelligence
+    provider: anthropic
+    model: claude-opus-4-6
+    temperature: 0.1
+
+  attack_planner:
+    # Diseño de la secuencia de ataque + incorporación de feedback del validator
+    # Opus: razonamiento estratégico, conocimiento del kill chain MITRE
+    provider: anthropic
+    model: claude-opus-4-6
+    temperature: 0.1
+
+  payload_crafter:
+    # Generación de snippets de emulación (código seguro)
+    # Sonnet: buen balance calidad/coste para generación de código técnico
+    provider: anthropic
+    model: claude-sonnet-4-5-20250929
+    temperature: 0.1
+
+  playbook_assembler:
+    # El ensamblado JSON es determinista; Sonnet solo para la narrativa de demo
+    provider: anthropic
+    model: claude-sonnet-4-5-20250929
+    temperature: 0.1
+
+  validator:
+    # Validación lógica + feedback para retry loop
+    # Sonnet: suficiente para razonamiento de validación, más económico que Opus
+    provider: anthropic
+    model: claude-sonnet-4-5-20250929
+    temperature: 0.1
 
 output:
   playbook_dir: playbooks
