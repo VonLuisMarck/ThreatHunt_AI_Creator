@@ -923,7 +923,7 @@ with st.sidebar:
                     )
                 agent_models[akey] = {"provider": sel_prov, "model": sel_model}
 
-    # ── API key status (dynamic: based on what's actually selected) ───
+    # ── API Keys ────────────────────────────────────────────────────────────
     # Collect which providers are in use
     _providers_in_use = set()
     if pipeline_mode == "multi_agent":
@@ -931,18 +931,72 @@ with st.sidebar:
     else:
         _providers_in_use = {llm_provider}
 
-    if "anthropic" in _providers_in_use:
-        if os.environ.get("ANTHROPIC_API_KEY"):
-            st.success("✅ ANTHROPIC_API_KEY set", icon=None)
-        else:
-            st.warning("⚠️ ANTHROPIC_API_KEY missing — add to .env")
-    if "openai" in _providers_in_use:
-        if os.environ.get("OPENAI_API_KEY"):
-            st.success("✅ OPENAI_API_KEY set", icon=None)
-        else:
-            st.warning("⚠️ OPENAI_API_KEY missing — add to .env")
-    if "ollama" in _providers_in_use:
-        st.info("🖥️ Ollama: no key needed — run `ollama serve` locally", icon=None)
+    def _save_key_to_env(env_var: str, value: str):
+        """Persist a key to .env and set it in os.environ for the current session."""
+        os.environ[env_var] = value
+        env_path = os.path.join(os.path.dirname(__file__), ".env")
+        try:
+            if os.path.exists(env_path):
+                with open(env_path, "r") as f:
+                    lines = f.readlines()
+                new_lines, found = [], False
+                for line in lines:
+                    if line.startswith(f"{env_var}="):
+                        new_lines.append(f"{env_var}={value}\n")
+                        found = True
+                    else:
+                        new_lines.append(line)
+                if not found:
+                    new_lines.append(f"{env_var}={value}\n")
+                with open(env_path, "w") as f:
+                    f.writelines(new_lines)
+            else:
+                with open(env_path, "w") as f:
+                    f.write(f"{env_var}={value}\n")
+        except OSError:
+            pass  # read-only filesystem — key is still set for this session
+
+    with st.expander("🔑 API Keys", expanded=not bool(os.environ.get("ANTHROPIC_API_KEY"))):
+        if "anthropic" in _providers_in_use or True:  # always show Anthropic field
+            _ant_current = os.environ.get("ANTHROPIC_API_KEY", "")
+            _ant_placeholder = "sk-ant-…  (already set)" if _ant_current else "Paste your Anthropic key"
+            _ant_input = st.text_input(
+                "Anthropic API Key",
+                value="",
+                type="password",
+                placeholder=_ant_placeholder,
+                help="Your key is used only in this session and saved to .env",
+                key="sidebar_anthropic_key",
+            )
+            if _ant_input and _ant_input != _ant_current:
+                _save_key_to_env("ANTHROPIC_API_KEY", _ant_input.strip())
+                st.success("✓ Anthropic key saved", icon=None)
+            elif _ant_current:
+                st.success("✅ Anthropic key active", icon=None)
+            else:
+                st.caption("Required when using Claude models.")
+
+        if "openai" in _providers_in_use:
+            _oai_current = os.environ.get("OPENAI_API_KEY", "")
+            _oai_placeholder = "sk-…  (already set)" if _oai_current else "Paste your OpenAI key"
+            _oai_input = st.text_input(
+                "OpenAI API Key",
+                value="",
+                type="password",
+                placeholder=_oai_placeholder,
+                help="Required when using GPT models",
+                key="sidebar_openai_key",
+            )
+            if _oai_input and _oai_input != _oai_current:
+                _save_key_to_env("OPENAI_API_KEY", _oai_input.strip())
+                st.success("✓ OpenAI key saved", icon=None)
+            elif _oai_current:
+                st.success("✅ OpenAI key active", icon=None)
+            else:
+                st.caption("Required when using GPT models.")
+
+        if "ollama" in _providers_in_use:
+            st.info("🖥️ Ollama: no key needed — run `ollama serve` locally", icon=None)
 
     st.markdown("---")
     analyze_btn = st.button("🚀 Analyze Report", disabled=uploaded_file is None)
