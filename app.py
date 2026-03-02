@@ -1255,7 +1255,7 @@ if "results" in st.session_state:
                 status_dot = "🟢 " if is_done else ""
                 lbl = f"{status_dot}{_btn_icons[key]} {_btn_names[key]}"
                 btn_type = "primary" if is_sel else "secondary"
-                if st.button(lbl, key=f"gnode_{key}", use_container_width=True, type=btn_type):
+                if st.button(lbl, key=f"gnode_{key}", width="stretch", type=btn_type):
                     new_val = None if is_sel else key   # toggle off if already selected
                     st.session_state["selected_agent_view"] = new_val
                     st.rerun()
@@ -1303,7 +1303,7 @@ if "results" in st.session_state:
             }
             df_meta = pd.DataFrame(list(meta_items.items()), columns=["Field", "Value"])
             df_meta["Value"] = df_meta["Value"].astype(str)
-            st.dataframe(df_meta, hide_index=True, use_container_width=True)
+            st.dataframe(df_meta, hide_index=True, width="stretch")
 
             st.markdown('<div class="section-title" style="margin-top:1rem">Sections Detected</div>', unsafe_allow_html=True)
             sections_found = list(content.get("sections", {}).keys())
@@ -1343,7 +1343,7 @@ if "results" in st.session_state:
                 }
                 for h in headings
             ]
-            st.dataframe(pd.DataFrame(h_data), hide_index=True, use_container_width=True)
+            st.dataframe(pd.DataFrame(h_data), hide_index=True, width="stretch")
 
         # Section previews
         if content.get("sections"):
@@ -1390,10 +1390,10 @@ if "results" in st.session_state:
                             st.code(cmd, language="powershell")
                     elif ioc_key in ("sha256", "sha1", "md5"):
                         df = pd.DataFrame(values, columns=["Hash"])
-                        st.dataframe(df, hide_index=True, use_container_width=True)
+                        st.dataframe(df, hide_index=True, width="stretch")
                     else:
                         df = pd.DataFrame(values, columns=[label])
-                        st.dataframe(df, hide_index=True, use_container_width=True)
+                        st.dataframe(df, hide_index=True, width="stretch")
 
     # ════════════════════════════════════════════════════════════
     # TAB 3 — TTPs
@@ -1438,7 +1438,7 @@ if "results" in st.session_state:
                     })
 
             df_ttps = pd.DataFrame(all_rows)
-            st.dataframe(df_ttps, hide_index=True, use_container_width=True,
+            st.dataframe(df_ttps, hide_index=True, width="stretch",
                          column_config={
                              "ID": st.column_config.TextColumn("ID", width=90),
                              "Sub-technique": st.column_config.TextColumn("Sub-tech", width=70),
@@ -1667,7 +1667,7 @@ if "results" in st.session_state:
                     "Next": ev.get("success_trigger") or "END",
                     "Kind": "🧹 Cleanup" if is_cleanup else "⚔️ Attack",
                 })
-            st.dataframe(pd.DataFrame(events_data), hide_index=True, use_container_width=True)
+            st.dataframe(pd.DataFrame(events_data), hide_index=True, width="stretch")
 
             # Event detail expanders
             with st.expander("📋 View event payloads"):
