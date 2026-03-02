@@ -2,14 +2,14 @@ llm:
   # Usado por el pipeline clásico (main.py sin --graph)
   # Provider: ollama | anthropic | openai
   # ollama    → local model, no cost, lower quality (good for dev)
-  # anthropic → Claude API, best quality (export ANTHROPIC_API_KEY=sk-ant-...)
-  # openai    → GPT-4 API, good quality   (export OPENAI_API_KEY=sk-...)
-  provider: ollama
-  model: llama3
+  # anthropic → Claude API, best quality (set ANTHROPIC_API_KEY in .env)
+  # openai    → GPT-4 API, good quality   (set OPENAI_API_KEY in .env)
+  provider: anthropic
+  model: claude-sonnet-4-6
   temperature: 0.1
   # Recommended models per provider:
   #   ollama:    llama3.1:70b, mixtral:8x7b
-  #   anthropic: claude-opus-4-6, claude-sonnet-4-5-20250929
+  #   anthropic: claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-5-20251001
   #   openai:    gpt-4o, gpt-4-turbo
 
 # ─────────────────────────────────────────────────────────────────────────────
@@ -43,20 +43,20 @@ agents:
     # Generación de snippets de emulación (código seguro)
     # Sonnet: buen balance calidad/coste para generación de código técnico
     provider: anthropic
-    model: claude-sonnet-4-5-20250929
+    model: claude-sonnet-4-6
     temperature: 0.1
 
   playbook_assembler:
     # El ensamblado JSON es determinista; Sonnet solo para la narrativa de demo
     provider: anthropic
-    model: claude-sonnet-4-5-20250929
+    model: claude-sonnet-4-6
     temperature: 0.1
 
   validator:
     # Validación lógica + feedback para retry loop
     # Sonnet: suficiente para razonamiento de validación, más económico que Opus
     provider: anthropic
-    model: claude-sonnet-4-5-20250929
+    model: claude-sonnet-4-6
     temperature: 0.1
 
 output:

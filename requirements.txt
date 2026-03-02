@@ -1,7 +1,8 @@
 pymupdf>=1.23.8
 iocextract>=1.16.1
 # mitreattack-python: stix2-elevator removed (caused resolution-too-deep errors)
-mitreattack-python
+# Pin <3 to avoid PyPI resolution errors with mitreattack-python==3.x
+mitreattack-python>=1.0.0,<3.0.0
 chromadb>=0.5.0
 langchain>=0.3.0
 langchain-community>=0.3.0

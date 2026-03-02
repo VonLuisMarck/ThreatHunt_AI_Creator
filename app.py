@@ -827,7 +827,7 @@ with st.sidebar:
     # Provider selector
     _PROVIDER_MODELS = {
         "ollama":    ["llama3", "llama3.1:70b", "llama3.2", "llama3.3:70b", "mixtral:8x7b", "mistral"],
-        "anthropic": ["claude-opus-4-6", "claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"],
+        "anthropic": ["claude-sonnet-4-6", "claude-opus-4-6", "claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"],
         "openai":    ["gpt-4o", "gpt-4-turbo", "gpt-4"],
     }
     _PROVIDER_LABELS = {
@@ -869,7 +869,7 @@ with st.sidebar:
         )
 
     # ── Per-agent model configuration (multi-agent mode only) ────────
-    _ALL_CLAUDE = ["claude-opus-4-6", "claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"]
+    _ALL_CLAUDE = ["claude-sonnet-4-6", "claude-opus-4-6", "claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"]
     _ALL_GPT    = ["gpt-4o", "gpt-4-turbo", "gpt-4"]
     _ALL_OLLAMA = ["llama3", "llama3.1:70b", "llama3.2", "mixtral:8x7b", "mistral", "codellama"]
     _AGENT_MODEL_OPTIONS = {
@@ -883,9 +883,9 @@ with st.sidebar:
         ("recon",              "🔍 Recon",       "claude-haiku-4-5-20251001",   "anthropic"),
         ("threat_intel",       "🧠 Threat Intel", "claude-opus-4-6",             "anthropic"),
         ("attack_planner",     "⚔️  Planner",     "claude-opus-4-6",             "anthropic"),
-        ("payload_crafter",    "💻 Crafter",      "claude-sonnet-4-5-20250929",  "anthropic"),
-        ("playbook_assembler", "📋 Assembler",    "claude-sonnet-4-5-20250929",  "anthropic"),
-        ("validator",          "✅ Validator",    "claude-sonnet-4-5-20250929",  "anthropic"),
+        ("payload_crafter",    "💻 Crafter",      "claude-sonnet-4-6",           "anthropic"),
+        ("playbook_assembler", "📋 Assembler",    "claude-sonnet-4-6",           "anthropic"),
+        ("validator",          "✅ Validator",    "claude-sonnet-4-6",           "anthropic"),
     ]
     agent_models = {}
     if pipeline_mode == "multi_agent":
