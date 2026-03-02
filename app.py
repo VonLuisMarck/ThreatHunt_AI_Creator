@@ -1302,6 +1302,7 @@ if "results" in st.session_state:
                 "Contains tables": "✅ Yes" if meta.get("has_tables") else "❌ No",
             }
             df_meta = pd.DataFrame(list(meta_items.items()), columns=["Field", "Value"])
+            df_meta["Value"] = df_meta["Value"].astype(str)
             st.dataframe(df_meta, hide_index=True, use_container_width=True)
 
             st.markdown('<div class="section-title" style="margin-top:1rem">Sections Detected</div>', unsafe_allow_html=True)
@@ -1335,7 +1336,7 @@ if "results" in st.session_state:
             st.markdown('<div class="section-title" style="margin-top:1rem">Document Structure (Headings)</div>', unsafe_allow_html=True)
             h_data = [
                 {
-                    "Page": h["page"],
+                    "Page": str(h.get("page") or "—"),
                     "Heading": h["text"][:80],
                     "Font size": f"{h['font_size']:.1f}",
                     "Bold": "✅" if h.get("is_bold") else "",
