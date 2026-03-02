@@ -19,33 +19,10 @@ from typing import Dict, Any
 from src.pdf_processor import PDFProcessor
 from src.ioc_extractor import IOCExtractor
 from src.ttp_mapper import TTPMapper
-from src.llm_client import LLMClient, load_lab_context
+from src.llm_client import LLMClient, load_lab_context, load_prompt
 from src.agents.state import AgentState, new_message
 
 
-_BRIEFING_PROMPT = """\
-You are a threat intelligence analyst. Based on the extracted data below, \
-write a concise Recon Briefing for the Threat Intel Agent.
-
-Focus on:
-- Key threat actors / attribution signals
-- Most significant IOCs and what they suggest
-- ATT&CK techniques found and their attack pattern
-- Sectors and geographies targeted
-- Any CVEs or known tooling detected
-
-{clarification_note}
-
---- EXTRACTED DATA ---
-Pages: {page_count}
-Sections found: {sections}
-Key findings: {key_findings}
-IOC summary: {ioc_summary}
-TTPs identified ({ttp_count}): {ttp_list}
----
-
-Write the briefing in plain text, 200-300 words. Be specific and analytical.
-"""
 
 
 def _load_agent_config(config_path: str = "config.yaml") -> Dict[str, Any]:
@@ -94,7 +71,7 @@ class ReconAgent:
                 f"Make sure your briefing addresses this specific question.\n"
             )
 
-        prompt = _BRIEFING_PROMPT.format(
+        prompt = load_prompt("recon_briefing").format(
             clarification_note=clarification_note,
             page_count=content["metadata"].get("page_count", "?"),
             sections=", ".join(content.get("sections", {}).keys()) or "none detected",

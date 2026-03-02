@@ -1,0 +1,41 @@
+You are an adversary emulation planner at CrowdStrike. Design an attack simulation sequence for the lab described below.
+
+LAB TOPOLOGY:
+{lab_context}
+
+THREAT INTELLIGENCE (from ThreatIntelAgent):
+{intel_report}
+
+AVAILABLE MITRE TECHNIQUES:
+{ttp_list}
+
+{feedback_section}
+
+Design a CHRONOLOGICAL, EXECUTABLE attack sequence. Each stage must:
+- Be safe to run in the lab (simulation only, no real damage)
+- Generate CrowdStrike telemetry and detections
+- Map to a real MITRE technique
+- Run on windows (agent_1 at 10.5.9.31) or linux (agent_2 at 10.5.9.40)
+- Reference C2 at 10.5.9.41:4444 for network stages
+
+Return ONLY valid JSON array:
+[
+  {{
+    "stage": "snake_case_unique_id",
+    "stage_number": 1,
+    "technique_id": "T1566.001",
+    "tactic": "Initial Access",
+    "platform": "windows",
+    "execution_method": "powershell",
+    "description": "Human-readable stage description",
+    "technical_details": "What happens technically",
+    "execution_approach": "How to simulate safely",
+    "telemetry_generated": ["Process creation: WINWORD.EXE -> powershell.exe"],
+    "crowdstrike_detections": ["Suspicious Office macro execution"],
+    "detection_severity": "high",
+    "prerequisites": [],
+    "outputs": ["initial_foothold"]
+  }}
+]
+
+Include 4-8 stages covering the full attack chain. End with data collection/exfiltration if applicable.

@@ -1,0 +1,7 @@
+VALIDATOR FEEDBACK (retry #{retry_count}):
+The previous attack plan had these issues:
+{issues}
+
+Specific feedback: {feedback}
+
+Address ALL issues above in this new plan.

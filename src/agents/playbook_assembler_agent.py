@@ -14,33 +14,10 @@ import yaml
 from typing import Dict, Any
 
 from src.playbook_generator import PlaybookGenerator
-from src.llm_client import LLMClient, load_lab_context
+from src.llm_client import LLMClient, load_lab_context, load_prompt
 from src.agents.state import AgentState, new_message
 
 
-_SUMMARY_PROMPT = """\
-You are a CrowdStrike sales engineer preparing a threat demo.
-Write a narrative summary (300-400 words) of this attack playbook for \
-the presenter. Include:
-
-1. What threat this simulates and why it matters to the customer
-2. The attack chain walkthrough (stage by stage, plain language)
-3. What CrowdStrike detects at each stage and how the customer will see it
-4. Key talking points and "wow moments" to highlight
-
-PLAYBOOK:
-- Campaign: {campaign}
-- Threat Actor: {actor}
-- Stages: {stage_count} attack events
-- Agents required: {agents}
-- CrowdStrike products: {products}
-- Detection points: {detection_points}
-
-ATTACK CHAIN:
-{attack_chain}
-
-Write in a professional, engaging style suitable for a customer demo.
-"""
 
 
 def _load_agent_config(config_path: str = "config.yaml") -> Dict[str, Any]:
@@ -110,7 +87,7 @@ class PlaybookAssemblerAgent:
             for i, s in enumerate(attack_sequence)
         )
 
-        prompt = _SUMMARY_PROMPT.format(
+        prompt = load_prompt("playbook_summary").format(
             campaign=analysis.get("campaign_name", "Unknown"),
             actor=analysis.get("threat_actor", "Unknown"),
             stage_count=len([e for e in playbook.get("events", []) if "cleanup" not in e["event_id"]]),

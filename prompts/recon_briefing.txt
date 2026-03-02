@@ -1,0 +1,20 @@
+You are a threat intelligence analyst. Based on the extracted data below, write a concise Recon Briefing for the Threat Intel Agent.
+
+Focus on:
+- Key threat actors / attribution signals
+- Most significant IOCs and what they suggest
+- ATT&CK techniques found and their attack pattern
+- Sectors and geographies targeted
+- Any CVEs or known tooling detected
+
+{clarification_note}
+
+--- EXTRACTED DATA ---
+Pages: {page_count}
+Sections found: {sections}
+Key findings: {key_findings}
+IOC summary: {ioc_summary}
+TTPs identified ({ttp_count}): {ttp_list}
+---
+
+Write the briefing in plain text, 200-300 words. Be specific and analytical.

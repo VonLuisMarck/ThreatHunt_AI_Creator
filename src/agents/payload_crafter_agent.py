@@ -16,32 +16,11 @@ import re
 import yaml
 from typing import Dict, Any, List, Optional
 
-from src.llm_client import LLMClient, load_lab_context
+from src.llm_client import LLMClient, load_lab_context, load_prompt
 from src.emulation_library import get_emulation_snippet, get_all_covered_techniques
 from src.agents.state import AgentState, new_message
 
 
-_SNIPPET_PROMPT = """\
-You are a red team engineer writing SAFE SIMULATION code for CrowdStrike lab demos.
-
-TECHNIQUE: {technique_id} — {technique_name}
-TACTIC: {tactic}
-PLATFORM: {platform}
-STAGE CONTEXT: {stage_context}
-REAL IOCs FROM REPORT: {ioc_context}
-LAB: C2 at 10.5.9.41:4444, Windows victim at 10.5.9.31, Linux victim at 10.5.9.40
-
-Write {payload_type} code that:
-1. Starts with Write-Host/print('[SIMULATION] {technique_id} ...')
-2. SIMULATES the technique behavior (generates telemetry, does NOT cause real damage)
-3. Uses the lab IPs above (not placeholders)
-4. Uses real IOCs from the report where applicable (C2 domain, hashes, etc.)
-5. Includes cleanup at the end
-6. Ends every PowerShell statement with ; (for one-liner conversion)
-
-Return ONLY the code, no explanations, no markdown fences.
-Max 40 lines. All code must be executable as-is.
-"""
 
 
 def _load_agent_config(config_path: str = "config.yaml") -> Dict[str, Any]:
@@ -129,7 +108,7 @@ class PayloadCrafterAgent:
         payload_type = "PowerShell" if platform == "windows" else "Python3"
         ioc_context  = _fmt_ioc_context(iocs, tid)
 
-        prompt = _SNIPPET_PROMPT.format(
+        prompt = load_prompt("payload_snippet").format(
             technique_id   = tid,
             technique_name = stage.get("description", tid),
             tactic         = stage.get("tactic", ""),

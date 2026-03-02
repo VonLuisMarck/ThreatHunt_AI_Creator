@@ -15,67 +15,10 @@ import re
 import yaml
 from typing import Dict, Any, List
 
-from src.llm_client import LLMClient, load_lab_context
+from src.llm_client import LLMClient, load_lab_context, load_prompt
 from src.agents.state import AgentState, new_message
 
 
-_ANALYSIS_PROMPT = """\
-You are a senior threat intelligence analyst at CrowdStrike.
-Your goal: assess whether this threat campaign can be safely demonstrated \
-in a CrowdStrike lab, and produce a structured JSON analysis.
-
-LAB CONTEXT:
-{lab_context}
-
-RECON BRIEFING (from ReconAgent):
-{recon_briefing}
-
-IOC SAMPLE:
-{ioc_sample}
-
-MITRE ATT&CK TECHNIQUES FOUND:
-{ttp_list}
-
-DOCUMENT EXCERPT:
-{doc_excerpt}
-
-Return ONLY valid JSON in this exact structure:
-{{
-  "threat_actor": "string",
-  "threat_actor_type": "nation-state|cybercriminal|hacktivist|unknown",
-  "campaign_name": "string",
-  "attack_vector": "string",
-  "platforms": ["windows", "linux"],
-  "target_industries": ["string"],
-  "target_geography": ["string"],
-  "attack_stages": [
-    {{
-      "stage_name": "string",
-      "tactic": "string",
-      "techniques": ["T1234"],
-      "description": "string",
-      "key_tools": ["string"]
-    }}
-  ],
-  "demonstrable": true,
-  "demo_risk": "low|medium|high",
-  "demo_complexity": "low|medium|high",
-  "setup_time": "minutes|hours|days",
-  "required_expertise": "beginner|intermediate|advanced",
-  "crowdstrike_products": ["Falcon Prevent", "Falcon Insight"],
-  "key_detection_points": ["string"],
-  "reasoning": "string",
-  "demo_modifications": "string",
-  "confidence_level": "low|medium|high",
-  "attribution_confidence": "low|medium|high",
-  "needs_clarification": false,
-  "clarification_question": ""
-}}
-
-If confidence_level is "low" OR you cannot determine threat_actor, set \
-needs_clarification=true and clarification_question to a specific question \
-for the ReconAgent to answer (it will do another pass on the raw PDF).
-"""
 
 
 def _load_agent_config(config_path: str = "config.yaml") -> Dict[str, Any]:
@@ -112,7 +55,7 @@ class ThreatIntelAgent:
         ttp_list       = _fmt_ttps(state["ttps"])
         doc_excerpt    = _get_doc_excerpt(state["content"])
 
-        prompt = _ANALYSIS_PROMPT.format(
+        prompt = load_prompt("threat_intel_analysis").format(
             lab_context=self.lab_context or "Standard CrowdStrike lab environment.",
             recon_briefing=recon_briefing,
             ioc_sample=ioc_sample,

@@ -12,6 +12,23 @@ Activa el modo debug para ver TODOS los prompts enviados y respuestas recibidas:
 
 Los bloques se imprimen en stderr con separadores visuales claros.
 
+── Editar prompts ───────────────────────────────────────────────────────────
+Todos los prompts están en prompts/*.txt — edítalos sin tocar código Python.
+Los cambios se aplican en el próximo uso (no hace falta reiniciar).
+
+    prompts/recon_briefing.txt
+    prompts/threat_intel_analysis.txt
+    prompts/attack_planner.txt
+    prompts/attack_planner_feedback.txt
+    prompts/payload_snippet.txt
+    prompts/playbook_summary.txt
+    prompts/validator_semantic.txt
+    prompts/analyzer_attack_sequence.txt
+    prompts/analyzer_playbook_summary.txt
+    prompts/analyzer_chunk_summary.txt
+    prompts/analyzer_analysis.txt
+    prompts/analyzer_emulation_snippet.txt
+
 ── Cambiar provider / modelo ────────────────────────────────────────────────
 Edita config.yaml → sección agents.<nombre_agente>:
 
@@ -29,6 +46,10 @@ import os
 import sys
 import yaml
 from typing import List
+
+# Directorio raíz del proyecto (un nivel arriba de src/)
+_PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_PROMPTS_DIR  = os.path.join(_PROJECT_ROOT, "prompts")
 
 from langchain.prompts import PromptTemplate
 from langchain.chains import LLMChain
@@ -186,9 +207,35 @@ class LLMClient:
         return result
 
 
+# ── Cargador de prompts ───────────────────────────────────────────────────────
+
+def load_prompt(name: str) -> str:
+    """
+    Carga el prompt desde prompts/<name>.txt.
+
+    No usa caché: cada llamada lee el fichero desde disco.
+    Así basta con editar el .txt y el próximo LLM call usará la versión nueva,
+    sin reiniciar la app.
+
+    Sintaxis dentro del .txt:
+      {variable}   → placeholder sustituido por str.format() o PromptTemplate
+      {{           → llave literal { en el texto enviado al LLM (ej. JSON de ejemplo)
+      }}           → llave literal }
+    """
+    path = os.path.join(_PROMPTS_DIR, f"{name}.txt")
+    try:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+    except FileNotFoundError:
+        raise FileNotFoundError(
+            f"Prompt '{name}' no encontrado en: {path}\n"
+            f"Comprueba que existe el fichero prompts/{name}.txt"
+        )
+
+
 # ── Aliases de compatibilidad hacia atrás ────────────────────────────────────
 # llm_analyzer.py y código legacy pueden seguir usando los nombres con _
 
-_build_llm       = build_llm
+_build_llm        = build_llm
 _load_lab_context = load_lab_context
-_CONTEXT_LIMITS  = CONTEXT_LIMITS
+_CONTEXT_LIMITS   = CONTEXT_LIMITS

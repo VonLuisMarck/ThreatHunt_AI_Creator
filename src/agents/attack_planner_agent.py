@@ -15,65 +15,10 @@ import re
 import yaml
 from typing import Dict, Any, List
 
-from src.llm_client import LLMClient, load_lab_context
+from src.llm_client import LLMClient, load_lab_context, load_prompt
 from src.agents.state import AgentState, new_message
 
 
-_PLANNER_PROMPT = """\
-You are an adversary emulation planner at CrowdStrike. Design an attack \
-simulation sequence for the lab described below.
-
-LAB TOPOLOGY:
-{lab_context}
-
-THREAT INTELLIGENCE (from ThreatIntelAgent):
-{intel_report}
-
-AVAILABLE MITRE TECHNIQUES:
-{ttp_list}
-
-{feedback_section}
-
-Design a CHRONOLOGICAL, EXECUTABLE attack sequence. Each stage must:
-- Be safe to run in the lab (simulation only, no real damage)
-- Generate CrowdStrike telemetry and detections
-- Map to a real MITRE technique
-- Run on windows (agent_1 at 10.5.9.31) or linux (agent_2 at 10.5.9.40)
-- Reference C2 at 10.5.9.41:4444 for network stages
-
-Return ONLY valid JSON array:
-[
-  {{
-    "stage": "snake_case_unique_id",
-    "stage_number": 1,
-    "technique_id": "T1566.001",
-    "tactic": "Initial Access",
-    "platform": "windows",
-    "execution_method": "powershell",
-    "description": "Human-readable stage description",
-    "technical_details": "What happens technically",
-    "execution_approach": "How to simulate safely",
-    "telemetry_generated": ["Process creation: WINWORD.EXE -> powershell.exe"],
-    "crowdstrike_detections": ["Suspicious Office macro execution"],
-    "detection_severity": "high",
-    "prerequisites": [],
-    "outputs": ["initial_foothold"]
-  }}
-]
-
-Include 4-8 stages covering the full attack chain. \
-End with data collection/exfiltration if applicable.
-"""
-
-_FEEDBACK_TEMPLATE = """\
-VALIDATOR FEEDBACK (retry #{retry_count}):
-The previous attack plan had these issues:
-{issues}
-
-Specific feedback: {feedback}
-
-Address ALL issues above in this new plan.
-"""
 
 
 def _load_agent_config(config_path: str = "config.yaml") -> Dict[str, Any]:
@@ -111,7 +56,7 @@ class AttackPlannerAgent:
         ttp_list        = _fmt_ttps(state["ttps"])
         feedback_section = _build_feedback_section(state)
 
-        prompt = _PLANNER_PROMPT.format(
+        prompt = load_prompt("attack_planner").format(
             lab_context=self.lab_context or "Standard CrowdStrike lab (win: 10.5.9.31, linux: 10.5.9.40, c2: 10.5.9.41:4444).",
             intel_report=intel_report,
             ttp_list=ttp_list,
@@ -164,7 +109,7 @@ def _build_feedback_section(state: AgentState) -> str:
     if retry == 0 or not validation.get("issues"):
         return ""
     issues_str = "\n".join(f"  - {issue}" for issue in validation.get("issues", []))
-    return _FEEDBACK_TEMPLATE.format(
+    return load_prompt("attack_planner_feedback").format(
         retry_count=retry,
         issues=issues_str,
         feedback=validation.get("feedback", ""),

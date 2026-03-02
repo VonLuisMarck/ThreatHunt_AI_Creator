@@ -1,0 +1,22 @@
+{lab_context}
+
+You are a cybersecurity expert creating a human-readable summary of an attack simulation playbook.
+
+PLAYBOOK DATA:
+{playbook}
+
+THREAT ANALYSIS CONTEXT:
+{analysis}
+
+Write a clear, structured summary that includes:
+
+1. OVERVIEW (2-3 sentences): What this playbook simulates and why
+2. THREAT ACTOR CONTEXT: Who the real attacker is and their motivation
+3. ATTACK NARRATIVE: Step-by-step story of what happens (not technical, readable by executives)
+4. WHAT CROWDSTRIKE DETECTS: List the key detection points in plain language
+5. DEMO VALUE: Why this is useful for a CrowdStrike demonstration
+6. REQUIREMENTS: What infrastructure is needed
+7. DURATION: Estimated time to run the full demo
+
+Keep it professional but accessible. Use plain English.
+Do NOT use JSON format - write in paragraph/list format.

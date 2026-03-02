@@ -22,35 +22,10 @@ import re
 import yaml
 from typing import Dict, Any, List, Tuple
 
-from src.llm_client import LLMClient
+from src.llm_client import LLMClient, load_prompt
 from src.agents.state import AgentState, ValidationResult, new_message
 
 
-_SEMANTIC_PROMPT = """\
-You are a quality assurance engineer reviewing an attack simulation playbook.
-
-PLAYBOOK SUMMARY:
-- Name: {name}
-- Agents: {agents}
-- Attack events: {attack_events}
-- Technique chain: {technique_chain}
-
-ATTACK SEQUENCE:
-{sequence_summary}
-
-Assess the playbook on these criteria:
-1. Is the kill chain logically coherent? (each stage prepares for the next)
-2. Are the techniques appropriate for their stated platforms?
-3. Are there any critical missing stages for the attack type?
-4. Would this demo clearly showcase CrowdStrike detections?
-
-Return ONLY valid JSON:
-{{
-  "semantically_valid": true,
-  "issues": [],
-  "feedback": "If invalid: specific actionable feedback for the planner (1-3 sentences max)"
-}}
-"""
 
 
 def _load_agent_config(config_path: str = "config.yaml") -> Dict[str, Any]:
@@ -140,7 +115,7 @@ class ValidatorAgent:
             for i, s in enumerate(attack_sequence)
         )
 
-        prompt = _SEMANTIC_PROMPT.format(
+        prompt = load_prompt("validator_semantic").format(
             name=playbook.get("name", "Unknown"),
             agents=[a["agent_type"] for a in playbook.get("mandatory_agents", [])],
             attack_events=len(attack_events),

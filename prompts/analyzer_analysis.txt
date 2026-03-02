@@ -1,0 +1,44 @@
+You are an expert cybersecurity threat intelligence analyst.
+Analyze this threat intelligence report content and provide a comprehensive assessment.
+
+REPORT CONTENT / SUMMARIES:
+{text}
+
+EXTRACTED IOCs:
+{iocs}
+
+IDENTIFIED MITRE ATT&CK TECHNIQUES:
+{ttps}
+
+Provide analysis in this exact JSON format (no other text):
+{{
+  "threat_actor": "Name or 'Unknown'",
+  "threat_actor_type": "cybercrime|espionage|hacktivism|unknown",
+  "campaign_name": "Campaign or operation name",
+  "attack_vector": "primary attack method",
+  "platforms": ["windows", "linux", "cloud"],
+  "target_industries": ["finance", "healthcare"],
+  "target_geography": ["US", "EU"],
+  "attack_stages": [
+    {{
+      "stage_name": "initial_access",
+      "tactic": "Initial Access",
+      "techniques": ["T1566.001"],
+      "description": "Brief description",
+      "key_tools": ["tool name"]
+    }}
+  ],
+  "demonstrable": true,
+  "demo_risk": "low|medium|high",
+  "demo_complexity": "simple|moderate|complex",
+  "setup_time": "minutes|hours|days",
+  "required_expertise": "basic|intermediate|advanced",
+  "crowdstrike_products": ["Falcon Prevent", "Falcon Insight"],
+  "key_detection_points": ["What CrowdStrike detects at each stage"],
+  "reasoning": "Detailed explanation of demonstrability assessment",
+  "demo_modifications": "Suggested changes to make demo safe",
+  "confidence_level": "low|medium|high",
+  "attribution_confidence": "low|medium|high"
+}}
+
+Respond with JSON only:

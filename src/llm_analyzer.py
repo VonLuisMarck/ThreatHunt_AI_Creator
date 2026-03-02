@@ -3,7 +3,7 @@ import json
 import re
 
 from src.emulation_library import get_emulation_snippet, get_all_covered_techniques
-from src.llm_client import LLMClient, load_lab_context, CONTEXT_LIMITS
+from src.llm_client import LLMClient, load_lab_context, load_prompt, CONTEXT_LIMITS
 
 # Aliases de compatibilidad para código que importa desde este módulo
 _build_llm       = LLMClient  # no usado directamente, pero preserva imports externos
@@ -75,35 +75,7 @@ class LLMAnalyzer:
         """Genera secuencia de ataque basada en el análisis y los TTPs."""
 
         result = self.client.chain_run(
-            template="""{lab_context}
-
-You are a cybersecurity automation engineer creating attack simulation sequences.
-
-THREAT ANALYSIS:
-{analysis}
-
-AVAILABLE TTPs (MITRE ATT&CK):
-{ttps}
-
-Create a logical, chronological attack sequence for lab execution.
-For each stage provide:
-- stage: snake_case name
-- stage_number: sequential integer
-- technique_id: MITRE ATT&CK ID
-- tactic: MITRE tactic name
-- platform: windows/linux/cloud
-- execution_method: powershell/python/bash/api
-- description: what happens in this stage
-- technical_details: how it works technically
-- execution_approach: how to execute this technique in the isolated lab using real lab infrastructure
-- telemetry_generated: list of telemetry events
-- crowdstrike_detections: list of what CrowdStrike detects
-- detection_severity: low/medium/high/critical
-- prerequisites: list of required previous outputs
-- outputs: list of what this stage produces
-
-Respond with valid JSON array ONLY, no other text:
-""",
+            template=load_prompt("analyzer_attack_sequence"),
             input_variables=["lab_context", "analysis", "ttps"],
             lab_context=self.lab_context,
             analysis=json.dumps(analysis, indent=2),
@@ -197,29 +169,7 @@ Respond with valid JSON array ONLY, no other text:
         ]
 
         result = self.client.chain_run(
-            template="""{lab_context}
-
-You are a cybersecurity expert creating a human-readable summary of an attack simulation playbook.
-
-PLAYBOOK DATA:
-{playbook}
-
-THREAT ANALYSIS CONTEXT:
-{analysis}
-
-Write a clear, structured summary that includes:
-
-1. OVERVIEW (2-3 sentences): What this playbook simulates and why
-2. THREAT ACTOR CONTEXT: Who the real attacker is and their motivation
-3. ATTACK NARRATIVE: Step-by-step story of what happens (not technical, readable by executives)
-4. WHAT CROWDSTRIKE DETECTS: List the key detection points in plain language
-5. DEMO VALUE: Why this is useful for a CrowdStrike demonstration
-6. REQUIREMENTS: What infrastructure is needed
-7. DURATION: Estimated time to run the full demo
-
-Keep it professional but accessible. Use plain English.
-Do NOT use JSON format - write in paragraph/list format.
-""",
+            template=load_prompt("analyzer_playbook_summary"),
             input_variables=["lab_context", "playbook", "analysis"],
             lab_context=self.lab_context,
             playbook=json.dumps(playbook_trimmed, indent=2),
@@ -273,15 +223,7 @@ Do NOT use JSON format - write in paragraph/list format.
 
         try:
             return self.client.chain_run(
-                template="""Extract the key cybersecurity threat intelligence from this section.
-Focus on: threat actors, attack techniques, tools used, IOCs, attack stages, targets.
-Be concise (max 300 words).
-
-SECTION: {section}
-CONTENT:
-{text}
-
-Key intelligence extracted:""",
+                template=load_prompt("analyzer_chunk_summary"),
                 input_variables=["section", "text"],
                 section=section_name,
                 text=text,
@@ -296,50 +238,7 @@ Key intelligence extracted:""",
     def _run_analysis(self, context: str, iocs: Dict, ttps: List[Dict]) -> Dict:
         """Ejecuta el prompt de análisis principal."""
         result = self.client.chain_run(
-            template="""You are an expert cybersecurity threat intelligence analyst.
-Analyze this threat intelligence report content and provide a comprehensive assessment.
-
-REPORT CONTENT / SUMMARIES:
-{text}
-
-EXTRACTED IOCs:
-{iocs}
-
-IDENTIFIED MITRE ATT&CK TECHNIQUES:
-{ttps}
-
-Provide analysis in this exact JSON format (no other text):
-{{
-  "threat_actor": "Name or 'Unknown'",
-  "threat_actor_type": "cybercrime|espionage|hacktivism|unknown",
-  "campaign_name": "Campaign or operation name",
-  "attack_vector": "primary attack method",
-  "platforms": ["windows", "linux", "cloud"],
-  "target_industries": ["finance", "healthcare"],
-  "target_geography": ["US", "EU"],
-  "attack_stages": [
-    {{
-      "stage_name": "initial_access",
-      "tactic": "Initial Access",
-      "techniques": ["T1566.001"],
-      "description": "Brief description",
-      "key_tools": ["tool name"]
-    }}
-  ],
-  "demonstrable": true,
-  "demo_risk": "low|medium|high",
-  "demo_complexity": "simple|moderate|complex",
-  "setup_time": "minutes|hours|days",
-  "required_expertise": "basic|intermediate|advanced",
-  "crowdstrike_products": ["Falcon Prevent", "Falcon Insight"],
-  "key_detection_points": ["What CrowdStrike detects at each stage"],
-  "reasoning": "Detailed explanation of demonstrability assessment",
-  "demo_modifications": "Suggested changes to make demo safe",
-  "confidence_level": "low|medium|high",
-  "attribution_confidence": "low|medium|high"
-}}
-
-Respond with JSON only:""",
+            template=load_prompt("analyzer_analysis"),
             input_variables=["text", "iocs", "ttps"],
             text=context[:self.CHUNK_SIZE * 2],
             iocs=json.dumps(iocs, indent=2)[:1000],
@@ -385,26 +284,7 @@ Respond with JSON only:""",
 
         try:
             code = self.client.chain_run(
-                template="""{lab_context}
-
-You are a cybersecurity engineer creating a real attack emulation snippet for an isolated lab environment.
-
-TECHNIQUE: {technique_id} - {technique_name}
-DESCRIPTION: {description}
-ATTACK STAGE CONTEXT: {stage_desc}
-PLATFORM: {platform}
-LANGUAGE: {lang}
-IOCs FROM REPORT (for context): {iocs_sample}
-
-Write a real, fully executable {lang} snippet for the isolated lab that:
-1. Actually executes the technique to generate authentic telemetry and trigger real CrowdStrike detections
-2. Uses the exact IPs, credentials, and C2 port from the lab architecture above — never use placeholders
-3. Labels the target machine at the top, e.g.: # [WIN-DETECTION 10.5.9.31]
-4. Includes cleanup at the end if files, registry keys, or connections are created
-5. Has inline comments explaining which CrowdStrike detection each step triggers
-6. Must be syntactically correct and executable as-is in the lab
-
-Respond with ONLY the code, no explanation:""",
+                template=load_prompt("analyzer_emulation_snippet"),
                 input_variables=["lab_context", "technique_id", "technique_name",
                                  "description", "stage_desc", "platform", "lang",
                                  "iocs_sample"],

@@ -1,0 +1,9 @@
+Extract the key cybersecurity threat intelligence from this section.
+Focus on: threat actors, attack techniques, tools used, IOCs, attack stages, targets.
+Be concise (max 300 words).
+
+SECTION: {section}
+CONTENT:
+{text}
+
+Key intelligence extracted:

@@ -1,0 +1,19 @@
+You are a red team engineer writing SAFE SIMULATION code for CrowdStrike lab demos.
+
+TECHNIQUE: {technique_id} — {technique_name}
+TACTIC: {tactic}
+PLATFORM: {platform}
+STAGE CONTEXT: {stage_context}
+REAL IOCs FROM REPORT: {ioc_context}
+LAB: C2 at 10.5.9.41:4444, Windows victim at 10.5.9.31, Linux victim at 10.5.9.40
+
+Write {payload_type} code that:
+1. Starts with Write-Host/print('[SIMULATION] {technique_id} ...')
+2. SIMULATES the technique behavior (generates telemetry, does NOT cause real damage)
+3. Uses the lab IPs above (not placeholders)
+4. Uses real IOCs from the report where applicable (C2 domain, hashes, etc.)
+5. Includes cleanup at the end
+6. Ends every PowerShell statement with ; (for one-liner conversion)
+
+Return ONLY the code, no explanations, no markdown fences.
+Max 40 lines. All code must be executable as-is.

@@ -1,0 +1,28 @@
+{lab_context}
+
+You are a cybersecurity automation engineer creating attack simulation sequences.
+
+THREAT ANALYSIS:
+{analysis}
+
+AVAILABLE TTPs (MITRE ATT&CK):
+{ttps}
+
+Create a logical, chronological attack sequence for lab execution.
+For each stage provide:
+- stage: snake_case name
+- stage_number: sequential integer
+- technique_id: MITRE ATT&CK ID
+- tactic: MITRE tactic name
+- platform: windows/linux/cloud
+- execution_method: powershell/python/bash/api
+- description: what happens in this stage
+- technical_details: how it works technically
+- execution_approach: how to execute this technique in the isolated lab using real lab infrastructure
+- telemetry_generated: list of telemetry events
+- crowdstrike_detections: list of what CrowdStrike detects
+- detection_severity: low/medium/high/critical
+- prerequisites: list of required previous outputs
+- outputs: list of what this stage produces
+
+Respond with valid JSON array ONLY, no other text:

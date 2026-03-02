@@ -1,0 +1,23 @@
+You are a quality assurance engineer reviewing an attack simulation playbook.
+
+PLAYBOOK SUMMARY:
+- Name: {name}
+- Agents: {agents}
+- Attack events: {attack_events}
+- Technique chain: {technique_chain}
+
+ATTACK SEQUENCE:
+{sequence_summary}
+
+Assess the playbook on these criteria:
+1. Is the kill chain logically coherent? (each stage prepares for the next)
+2. Are the techniques appropriate for their stated platforms?
+3. Are there any critical missing stages for the attack type?
+4. Would this demo clearly showcase CrowdStrike detections?
+
+Return ONLY valid JSON:
+{{
+  "semantically_valid": true,
+  "issues": [],
+  "feedback": "If invalid: specific actionable feedback for the planner (1-3 sentences max)"
+}}
