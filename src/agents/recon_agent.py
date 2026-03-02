@@ -19,7 +19,7 @@ from typing import Dict, Any
 from src.pdf_processor import PDFProcessor
 from src.ioc_extractor import IOCExtractor
 from src.ttp_mapper import TTPMapper
-from src.llm_analyzer import _build_llm, _load_lab_context
+from src.llm_client import LLMClient, load_lab_context
 from src.agents.state import AgentState, new_message
 
 
@@ -66,11 +66,11 @@ class ReconAgent:
         agent_cfg = _load_agent_config(config_path)
         if model_override:
             agent_cfg.update(model_override)
-        provider   = agent_cfg.get("provider", "anthropic")
-        model      = agent_cfg.get("model", "claude-haiku-4-5-20251001")
+        provider    = agent_cfg.get("provider", "anthropic")
+        model       = agent_cfg.get("model", "claude-haiku-4-5-20251001")
         temperature = agent_cfg.get("temperature", 0.1)
-        self.llm = _build_llm(provider, model, temperature)
-        self.lab_context = _load_lab_context(config_path)
+        self.llm = LLMClient(provider, model, temperature, agent_name=self.name)
+        self.lab_context = load_lab_context(config_path)
 
     # ── LangGraph node ────────────────────────────────────────────
 
@@ -105,8 +105,7 @@ class ReconAgent:
         )
 
         full_prompt = f"{self.lab_context}\n\n{prompt}" if self.lab_context else prompt
-        briefing = self.llm.invoke(full_prompt)
-        briefing_text = briefing.content if hasattr(briefing, "content") else str(briefing)
+        briefing_text = self.llm.invoke(full_prompt)
 
         print(f"[{self.name}] Recon briefing written ({len(briefing_text)} chars)")
 

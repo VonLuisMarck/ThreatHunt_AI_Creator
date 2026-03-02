@@ -16,7 +16,7 @@ import re
 import yaml
 from typing import Dict, Any, List, Optional
 
-from src.llm_analyzer import _build_llm, _load_lab_context
+from src.llm_client import LLMClient, load_lab_context
 from src.emulation_library import get_emulation_snippet, get_all_covered_techniques
 from src.agents.state import AgentState, new_message
 
@@ -66,8 +66,8 @@ class PayloadCrafterAgent:
         provider    = agent_cfg.get("provider", "anthropic")
         model       = agent_cfg.get("model", "claude-sonnet-4-5-20250929")
         temperature = agent_cfg.get("temperature", 0.1)
-        self.llm         = _build_llm(provider, model, temperature)
-        self.lab_context = _load_lab_context(config_path)
+        self.llm         = LLMClient(provider, model, temperature, agent_name=self.name)
+        self.lab_context = load_lab_context(config_path)
         self._library_tids = set(get_all_covered_techniques())
 
     # ── LangGraph node ────────────────────────────────────────────
@@ -140,8 +140,7 @@ class PayloadCrafterAgent:
         )
 
         try:
-            response = self.llm.invoke(prompt)
-            code = response.content if hasattr(response, "content") else str(response)
+            code = self.llm.invoke(prompt)
             code = _strip_fences(code)
             if len(code) < 20:
                 return None

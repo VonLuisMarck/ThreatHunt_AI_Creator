@@ -15,7 +15,7 @@ import re
 import yaml
 from typing import Dict, Any, List
 
-from src.llm_analyzer import _build_llm, _load_lab_context
+from src.llm_client import LLMClient, load_lab_context
 from src.agents.state import AgentState, new_message
 
 
@@ -97,8 +97,8 @@ class AttackPlannerAgent:
         provider    = agent_cfg.get("provider", "anthropic")
         model       = agent_cfg.get("model", "claude-opus-4-6")
         temperature = agent_cfg.get("temperature", 0.1)
-        self.llm         = _build_llm(provider, model, temperature)
-        self.lab_context = _load_lab_context(config_path)
+        self.llm         = LLMClient(provider, model, temperature, agent_name=self.name)
+        self.lab_context = load_lab_context(config_path)
 
     # ── LangGraph node ────────────────────────────────────────────
 
@@ -118,8 +118,7 @@ class AttackPlannerAgent:
             feedback_section=feedback_section,
         )
 
-        response = self.llm.invoke(prompt)
-        raw = response.content if hasattr(response, "content") else str(response)
+        raw = self.llm.invoke(prompt)
         attack_sequence = _extract_json_list(raw)
 
         # Normalizar stage IDs (sin espacios, snake_case)

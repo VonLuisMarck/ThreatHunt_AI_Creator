@@ -14,7 +14,7 @@ import yaml
 from typing import Dict, Any
 
 from src.playbook_generator import PlaybookGenerator
-from src.llm_analyzer import _build_llm, _load_lab_context
+from src.llm_client import LLMClient, load_lab_context
 from src.agents.state import AgentState, new_message
 
 
@@ -64,8 +64,8 @@ class PlaybookAssemblerAgent:
         provider    = agent_cfg.get("provider", "anthropic")
         model       = agent_cfg.get("model", "claude-sonnet-4-5-20250929")
         temperature = agent_cfg.get("temperature", 0.1)
-        self.llm            = _build_llm(provider, model, temperature)
-        self.lab_context    = _load_lab_context(config_path)
+        self.llm            = LLMClient(provider, model, temperature, agent_name=self.name)
+        self.lab_context    = load_lab_context(config_path)
         self.playbook_gen   = PlaybookGenerator(config_path)
         self.config_path    = config_path
 
@@ -121,8 +121,7 @@ class PlaybookAssemblerAgent:
         )
 
         try:
-            response = self.llm.invoke(prompt)
-            return response.content if hasattr(response, "content") else str(response)
+            return self.llm.invoke(prompt)
         except Exception as e:
             return f"Summary generation failed: {e}"
 

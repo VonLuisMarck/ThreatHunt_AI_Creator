@@ -1,84 +1,14 @@
-from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
 from typing import Dict, List, Optional
 import json
 import re
-import os
 
-import yaml
 from src.emulation_library import get_emulation_snippet, get_all_covered_techniques
+from src.llm_client import LLMClient, load_lab_context, CONTEXT_LIMITS
 
-
-def _load_lab_context(config_path: str = "config.yaml") -> str:
-    """
-    Lee la ruta del system prompt de arquitectura desde config.yaml y devuelve su contenido.
-    Falla silenciosamente si el archivo no existe para no romper flujos sin lab context.
-    """
-    try:
-        with open(config_path, "r") as f:
-            cfg = yaml.safe_load(f)
-        prompt_path = cfg.get("lab", {}).get("lab_context_prompt", "")
-        if not prompt_path:
-            return ""
-        base_dir = os.path.dirname(os.path.abspath(config_path))
-        full_path = os.path.join(base_dir, prompt_path)
-        with open(full_path, "r") as f:
-            return f.read().strip()
-    except Exception:
-        return ""
-
-
-def _build_llm(provider: str, model_name: str, temperature: float = 0.1):
-    """
-    Factory que instancia el LLM correcto según el proveedor.
-
-    Proveedores soportados:
-    - ollama    → Ollama local (llama3, llama3.1:70b, mixtral, etc.)
-    - anthropic → Claude API  (claude-opus-4-6, claude-sonnet-4-5, claude-haiku-4-5)
-    - openai    → OpenAI API  (gpt-4o, gpt-4-turbo, gpt-4)
-
-    Las API keys se leen de variables de entorno:
-    - ANTHROPIC_API_KEY
-    - OPENAI_API_KEY
-    """
-    if provider == "anthropic":
-        from langchain_anthropic import ChatAnthropic
-        api_key = os.environ.get("ANTHROPIC_API_KEY", "")
-        if not api_key:
-            raise ValueError(
-                "ANTHROPIC_API_KEY not set. Export it: export ANTHROPIC_API_KEY=sk-ant-..."
-            )
-        return ChatAnthropic(
-            model=model_name,
-            temperature=temperature,
-            anthropic_api_key=api_key,
-            max_tokens=4096,
-        )
-
-    if provider == "openai":
-        from langchain_openai import ChatOpenAI
-        api_key = os.environ.get("OPENAI_API_KEY", "")
-        if not api_key:
-            raise ValueError(
-                "OPENAI_API_KEY not set. Export it: export OPENAI_API_KEY=sk-..."
-            )
-        return ChatOpenAI(
-            model=model_name,
-            temperature=temperature,
-            openai_api_key=api_key,
-        )
-
-    # Default: Ollama local
-    from langchain_community.llms import Ollama
-    return Ollama(model=model_name, temperature=temperature)
-
-
-# Context window per provider — determines how much text we send per call
-_CONTEXT_LIMITS = {
-    "anthropic": 16000,   # Claude has 200k context, we use 16k per call to be safe
-    "openai":    12000,   # GPT-4o has 128k context
-    "ollama":     4000,   # Local models: conservative default
-}
+# Aliases de compatibilidad para código que importa desde este módulo
+_build_llm       = LLMClient  # no usado directamente, pero preserva imports externos
+_load_lab_context = load_lab_context
+_CONTEXT_LIMITS  = CONTEXT_LIMITS
 
 
 class LLMAnalyzer:
@@ -107,10 +37,10 @@ class LLMAnalyzer:
     ):
         self.provider = provider
         self.model_name = model_name
-        self.llm = _build_llm(provider, model_name)
-        self.lab_context = _load_lab_context(config_path)
+        self.client = LLMClient(provider, model_name, agent_name="LLMAnalyzer")
+        self.lab_context = load_lab_context(config_path)
         # Adapt chunk size to provider's context window
-        self.CHUNK_SIZE = _CONTEXT_LIMITS.get(provider, 4000)
+        self.CHUNK_SIZE = CONTEXT_LIMITS.get(provider, 4000)
 
     # ──────────────────────────────────────────────────────────────
     #  Main analysis (processes FULL document via chunking)
@@ -144,8 +74,7 @@ class LLMAnalyzer:
     def generate_attack_sequence(self, analysis: Dict, ttps: List[Dict]) -> List[Dict]:
         """Genera secuencia de ataque basada en el análisis y los TTPs."""
 
-        prompt = PromptTemplate(
-            input_variables=["lab_context", "analysis", "ttps"],
+        result = self.client.chain_run(
             template="""{lab_context}
 
 You are a cybersecurity automation engineer creating attack simulation sequences.
@@ -175,13 +104,10 @@ For each stage provide:
 
 Respond with valid JSON array ONLY, no other text:
 """,
-        )
-
-        chain = LLMChain(llm=self.llm, prompt=prompt)
-        result = chain.run(
+            input_variables=["lab_context", "analysis", "ttps"],
             lab_context=self.lab_context,
             analysis=json.dumps(analysis, indent=2),
-            ttps=json.dumps(ttps[:15], indent=2),  # Top 15 TTPs
+            ttps=json.dumps(ttps[:15], indent=2),
         )
 
         parsed = self._extract_json(result)
@@ -261,8 +187,16 @@ Respond with valid JSON array ONLY, no other text:
         Genera un resumen narrativo del playbook en lenguaje natural.
         Incluye: qué hace, cómo se ejecuta, qué detecta CrowdStrike.
         """
-        prompt = PromptTemplate(
-            input_variables=["lab_context", "playbook", "analysis"],
+        # Trim playbook to avoid token overflow
+        playbook_trimmed = {
+            k: v for k, v in playbook.items() if k != "events"
+        }
+        playbook_trimmed["events_summary"] = [
+            {"id": e.get("event_id"), "name": e.get("name"), "technique": e.get("mitre_technique")}
+            for e in playbook.get("events", [])[:10]
+        ]
+
+        result = self.client.chain_run(
             template="""{lab_context}
 
 You are a cybersecurity expert creating a human-readable summary of an attack simulation playbook.
@@ -286,20 +220,7 @@ Write a clear, structured summary that includes:
 Keep it professional but accessible. Use plain English.
 Do NOT use JSON format - write in paragraph/list format.
 """,
-        )
-
-        chain = LLMChain(llm=self.llm, prompt=prompt)
-
-        # Trim playbook to avoid token overflow
-        playbook_trimmed = {
-            k: v for k, v in playbook.items() if k != "events"
-        }
-        playbook_trimmed["events_summary"] = [
-            {"id": e.get("event_id"), "name": e.get("name"), "technique": e.get("mitre_technique")}
-            for e in playbook.get("events", [])[:10]
-        ]
-
-        result = chain.run(
+            input_variables=["lab_context", "playbook", "analysis"],
             lab_context=self.lab_context,
             playbook=json.dumps(playbook_trimmed, indent=2),
             analysis=json.dumps(analysis, indent=2),
@@ -350,9 +271,9 @@ Do NOT use JSON format - write in paragraph/list format.
         if not text.strip():
             return ""
 
-        prompt = PromptTemplate(
-            input_variables=["section", "text"],
-            template="""Extract the key cybersecurity threat intelligence from this section.
+        try:
+            return self.client.chain_run(
+                template="""Extract the key cybersecurity threat intelligence from this section.
 Focus on: threat actors, attack techniques, tools used, IOCs, attack stages, targets.
 Be concise (max 300 words).
 
@@ -361,11 +282,10 @@ CONTENT:
 {text}
 
 Key intelligence extracted:""",
-        )
-
-        chain = LLMChain(llm=self.llm, prompt=prompt)
-        try:
-            return chain.run(section=section_name, text=text).strip()
+                input_variables=["section", "text"],
+                section=section_name,
+                text=text,
+            ).strip()
         except Exception:
             return text[:500]  # Fallback: use raw text truncated
 
@@ -375,8 +295,7 @@ Key intelligence extracted:""",
 
     def _run_analysis(self, context: str, iocs: Dict, ttps: List[Dict]) -> Dict:
         """Ejecuta el prompt de análisis principal."""
-        prompt = PromptTemplate(
-            input_variables=["text", "iocs", "ttps"],
+        result = self.client.chain_run(
             template="""You are an expert cybersecurity threat intelligence analyst.
 Analyze this threat intelligence report content and provide a comprehensive assessment.
 
@@ -421,10 +340,7 @@ Provide analysis in this exact JSON format (no other text):
 }}
 
 Respond with JSON only:""",
-        )
-
-        chain = LLMChain(llm=self.llm, prompt=prompt)
-        result = chain.run(
+            input_variables=["text", "iocs", "ttps"],
             text=context[:self.CHUNK_SIZE * 2],
             iocs=json.dumps(iocs, indent=2)[:1000],
             ttps=json.dumps(ttps[:10], indent=2),
@@ -462,11 +378,14 @@ Respond with JSON only:""",
 
         lang = "PowerShell" if platform == "windows" else "Python"
 
-        prompt = PromptTemplate(
-            input_variables=["lab_context", "technique_id", "technique_name",
-                             "description", "stage_desc", "platform", "lang",
-                             "iocs_sample"],
-            template="""{lab_context}
+        iocs_sample = {
+            k: v[:2] for k, v in iocs.items()
+            if v and k in ("ipv4", "domains", "commands", "file_paths")
+        }
+
+        try:
+            code = self.client.chain_run(
+                template="""{lab_context}
 
 You are a cybersecurity engineer creating a real attack emulation snippet for an isolated lab environment.
 
@@ -486,16 +405,9 @@ Write a real, fully executable {lang} snippet for the isolated lab that:
 6. Must be syntactically correct and executable as-is in the lab
 
 Respond with ONLY the code, no explanation:""",
-        )
-
-        chain = LLMChain(llm=self.llm, prompt=prompt)
-        iocs_sample = {
-            k: v[:2] for k, v in iocs.items()
-            if v and k in ("ipv4", "domains", "commands", "file_paths")
-        }
-
-        try:
-            code = chain.run(
+                input_variables=["lab_context", "technique_id", "technique_name",
+                                 "description", "stage_desc", "platform", "lang",
+                                 "iocs_sample"],
                 lab_context=self.lab_context,
                 technique_id=technique_id,
                 technique_name=ttp_meta.get("name", technique_id),

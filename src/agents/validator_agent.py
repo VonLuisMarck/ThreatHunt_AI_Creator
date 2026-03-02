@@ -22,7 +22,7 @@ import re
 import yaml
 from typing import Dict, Any, List, Tuple
 
-from src.llm_analyzer import _build_llm
+from src.llm_client import LLMClient
 from src.agents.state import AgentState, ValidationResult, new_message
 
 
@@ -74,7 +74,7 @@ class ValidatorAgent:
         provider    = agent_cfg.get("provider", "anthropic")
         model       = agent_cfg.get("model", "claude-sonnet-4-5-20250929")
         temperature = agent_cfg.get("temperature", 0.1)
-        self.llm = _build_llm(provider, model, temperature)
+        self.llm = LLMClient(provider, model, temperature, agent_name=self.name)
 
     # ── LangGraph node ────────────────────────────────────────────
 
@@ -149,8 +149,7 @@ class ValidatorAgent:
         )
 
         try:
-            response = self.llm.invoke(prompt)
-            raw = response.content if hasattr(response, "content") else str(response)
+            raw = self.llm.invoke(prompt)
             result = _extract_json(raw)
             if result.get("semantically_valid", True):
                 return [], ""
