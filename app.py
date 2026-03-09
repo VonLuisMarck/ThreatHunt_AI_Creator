@@ -1637,19 +1637,14 @@ if "results" in st.session_state:
     with tabs[4]:
         replay_scripts = res.get("replay_scripts", [])
         if replay_scripts:
-            st.markdown(f"**{len(replay_scripts)} Replay Scripts** — third-party platform stages (email/cloud/SaaS)")
+            st.markdown(
+                f'<div style="font-size:0.8rem;color:#666;margin-bottom:0.5rem">'
+                f'⚠️ {len(replay_scripts)} stage(s) involve third-party platforms '
+                f'(email/cloud/SaaS) — use existing replay scripts for those.</div>',
+                unsafe_allow_html=True,
+            )
             for rs in replay_scripts:
-                col_dl, col_info = st.columns([1, 3])
-                with col_dl:
-                    st.download_button(
-                        f"⬇️ {rs['filename']}",
-                        data=rs["content"],
-                        file_name=rs["filename"],
-                        mime="text/plain",
-                        key=f"dl_replay_{rs['stage']}",
-                    )
-                with col_info:
-                    st.caption(f"`{rs['technique_id']}` — {rs['description'][:80]}")
+                st.caption(f"  `{rs['technique_id']}` — {rs['description'][:80]} → use lab replay script")
             st.markdown("---")
 
         if not snippets:
