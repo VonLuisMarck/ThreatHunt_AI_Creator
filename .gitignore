@@ -28,3 +28,4 @@ Thumbs.db
 *.log
 .env
 outputs/
+run_history/

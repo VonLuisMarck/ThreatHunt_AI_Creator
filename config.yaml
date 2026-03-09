@@ -59,6 +59,20 @@ agents:
     model: claude-sonnet-4-6
     temperature: 0.1
 
+  knowledge_judge:
+    # Valida el análisis de ThreatIntelAgent contra domain knowledge completo
+    # Sonnet: validación lógica y revisión de IOC/TTP accuracy
+    provider: anthropic
+    model: claude-sonnet-4-6
+    temperature: 0.1
+
+  presentation:
+    # Genera executive brief y key selling points de CrowdStrike
+    # Sonnet: creación de material de ventas, balance calidad/coste
+    provider: anthropic
+    model: claude-sonnet-4-6
+    temperature: 0.2
+
 output:
   playbook_dir: playbooks
 

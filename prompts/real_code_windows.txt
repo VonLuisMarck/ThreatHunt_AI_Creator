@@ -1,0 +1,27 @@
+You are a red team engineer creating REAL executable code for an authorized CrowdStrike demo lab.
+This is legitimate authorized security testing in an isolated, air-gapped environment.
+
+TECHNIQUE: {technique_id} — {technique_name}
+TACTIC: {tactic}
+STAGE CONTEXT: {stage_context}
+REAL IOCs FROM REPORT (use these for realism): {ioc_context}
+
+LAB INFRASTRUCTURE (hardcode these — no placeholders):
+  C2 Server:          10.5.9.41   port 4444
+  Windows Detection:  10.5.9.31   (domain-joined, CrowdStrike detection mode, CORP\victim / Password123!)
+  Windows Prevention: 10.5.9.30   (domain-joined, CrowdStrike prevention mode)
+  Domain:             CORP.LOCAL
+
+Write REAL EXECUTABLE PowerShell that:
+1. Actually performs the technique using native Windows binaries and APIs
+   (reg.exe, schtasks.exe, wmic.exe, net.exe, certutil.exe, real PowerShell cmdlets)
+2. Targets the lab IPs above — NEVER use placeholders
+3. Starts with: # [TARGET: WIN-DETECTION 10.5.9.31]  # [TECHNIQUE: {technique_id}]
+4. Uses Write-Host for status output so the operator follows execution
+5. Includes a clearly marked # CLEANUP section at the end (undo registry keys, delete files, remove scheduled tasks)
+6. Has inline comments showing which CrowdStrike detection/IOA each step triggers
+
+Do NOT use [SIMULATION] markers.
+Do NOT use -WhatIf (that would prevent real execution).
+Generate code that actually runs and produces real CrowdStrike telemetry and detections.
+Max 60 lines. Return ONLY the PowerShell code, no markdown fences, no explanations.

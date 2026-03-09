@@ -51,6 +51,16 @@ class AgentState(TypedDict):
     # ── ValidatorAgent ────────────────────────────────────────────
     validation: ValidationResult
 
+    # ── KnowledgeJudgeAgent ───────────────────────────────────────
+    knowledge_verdict: Dict[str, Any]  # veredicto JSON del juez
+
+    # ── PresentationAgent ─────────────────────────────────────────
+    presentation: Dict[str, Any]  # headline, exec_brief_md, key_selling_points…
+
+    # ── PayloadCrafterAgent extras ────────────────────────────────
+    replay_scripts:  List[Dict]   # scripts .sh para stages 3P
+    generation_mode: str          # "simulation" | "real_code"
+
     # ── Control de flujo ──────────────────────────────────────────
     retry_count: int
     max_retries: int
@@ -71,7 +81,11 @@ def new_message(agent: str, content: str) -> AgentMessage:
     )
 
 
-def initial_state(pdf_path: str, platform: str = "windows") -> AgentState:
+def initial_state(
+    pdf_path: str,
+    platform: str = "windows",
+    generation_mode: str = "simulation",
+) -> AgentState:
     """Estado inicial vacío para arrancar el grafo."""
     return AgentState(
         pdf_path=pdf_path,
@@ -87,6 +101,10 @@ def initial_state(pdf_path: str, platform: str = "windows") -> AgentState:
         playbook={},
         narrative_summary="",
         validation=ValidationResult(valid=False, issues=[], feedback=""),
+        knowledge_verdict={},
+        presentation={},
+        replay_scripts=[],
+        generation_mode=generation_mode,
         retry_count=0,
         max_retries=2,
         errors=[],

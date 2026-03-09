@@ -15,6 +15,8 @@ import pandas as pd
 from pathlib import Path
 from datetime import datetime
 
+from src.run_history import save_run, list_runs, load_run
+
 # ─────────────────────────────────────────────────────────────────
 #  Page config (must be first Streamlit call)
 # ─────────────────────────────────────────────────────────────────
@@ -428,21 +430,28 @@ def tactic_pill(tactic: str) -> str:
 _GRAPH_NODES = [
     ("recon",              "🔍", "Recon",     "Haiku",  75),
     ("threat_intel",       "🧠", "Intel",      "Opus",   220),
-    ("attack_planner",     "⚔️",  "Planner",    "Opus",   365),
-    ("payload_crafter",    "💻", "Crafter",    "Sonnet", 510),
-    ("playbook_assembler", "📋", "Assembler",  "Sonnet", 655),
-    ("validator",          "✅", "Validator",  "Sonnet", 800),
+    ("knowledge_judge",    "⚖️",  "Judge",      "Sonnet", 365),
+    ("attack_planner",     "⚔️",  "Planner",    "Opus",   510),
+    ("payload_crafter",    "💻", "Crafter",    "Sonnet", 655),
+    ("playbook_assembler", "📋", "Assembler",  "Sonnet", 800),
+    ("validator",          "✅", "Validator",  "Sonnet", 945),
+    ("presentation",       "🎤", "Presenter",  "Sonnet", 1090),
 ]
 _KEY_TO_AGENT_NAME = {
-    "recon": "ReconAgent", "threat_intel": "ThreatIntelAgent",
-    "attack_planner": "AttackPlannerAgent", "payload_crafter": "PayloadCrafterAgent",
-    "playbook_assembler": "PlaybookAssemblerAgent", "validator": "ValidatorAgent",
+    "recon":              "ReconAgent",
+    "threat_intel":       "ThreatIntelAgent",
+    "knowledge_judge":    "KnowledgeJudgeAgent",
+    "attack_planner":     "AttackPlannerAgent",
+    "payload_crafter":    "PayloadCrafterAgent",
+    "playbook_assembler": "PlaybookAssemblerAgent",
+    "validator":          "ValidatorAgent",
+    "presentation":       "PresentationAgent",
 }
 
 
 def _agent_graph_svg(statuses: dict = None, selected: str = None) -> str:
     """
-    Renders the 6-agent pipeline as an SVG graph.
+    Renders the 8-agent pipeline as an SVG graph.
 
     statuses: dict  {agent_key: "idle"|"done"|"active"|"error"|"skipped"}
     selected: str   agent_key of the currently selected node (highlighted)
@@ -455,7 +464,7 @@ def _agent_graph_svg(statuses: dict = None, selected: str = None) -> str:
         "error":   ("#1a0505", "#cc3030", "#cc8080"),
         "skipped": ("#0d0d1a", "#303060", "#606080"),
     }
-    W, H, NW, NH, CY = 920, 215, 110, 65, 104
+    W, H, NW, NH, CY = 1200, 215, 100, 65, 104
 
     def node_svg(key, icon, name, model, cx):
         status = statuses.get(key, "idle")
@@ -466,21 +475,22 @@ def _agent_graph_svg(statuses: dict = None, selected: str = None) -> str:
         x, y = cx - NW // 2, CY - NH // 2
         dot = ""
         if status == "done":
-            dot = f'<circle cx="{cx + NW//2 - 8}" cy="{y+8}" r="4" fill="#2a8a2a"/>'
+            dot = f'<circle cx="{cx + NW//2 - 7}" cy="{y+7}" r="4" fill="#2a8a2a"/>'
         elif status == "active":
-            dot = f'<circle cx="{cx + NW//2 - 8}" cy="{y+8}" r="4" fill="#cc8800"/>'
+            dot = f'<circle cx="{cx + NW//2 - 7}" cy="{y+7}" r="4" fill="#cc8800"/>'
         elif status == "error":
-            dot = f'<circle cx="{cx + NW//2 - 8}" cy="{y+8}" r="4" fill="#cc3030"/>'
+            dot = f'<circle cx="{cx + NW//2 - 7}" cy="{y+7}" r="4" fill="#cc3030"/>'
         return (
             f'<rect x="{x+2}" y="{y+2}" width="{NW}" height="{NH}" rx="8" fill="rgba(0,0,0,0.45)"/>'
             f'<rect x="{x}" y="{y}" width="{NW}" height="{NH}" rx="8" fill="{fill}" stroke="{stroke}" stroke-width="{sw}"/>'
             f'{dot}'
-            f'<text x="{cx}" y="{y+19}" text-anchor="middle" font-size="15">{icon}</text>'
-            f'<text x="{cx}" y="{y+33}" text-anchor="middle" font-size="10" fill="{tc}" font-weight="bold" font-family="sans-serif">{name}</text>'
-            f'<text x="{cx}" y="{y+47}" text-anchor="middle" font-size="8.5" fill="#4a4a5a" font-family="monospace">{model}</text>'
+            f'<text x="{cx}" y="{y+18}" text-anchor="middle" font-size="14">{icon}</text>'
+            f'<text x="{cx}" y="{y+31}" text-anchor="middle" font-size="9.5" fill="{tc}" font-weight="bold" font-family="sans-serif">{name}</text>'
+            f'<text x="{cx}" y="{y+45}" text-anchor="middle" font-size="8" fill="#4a4a5a" font-family="monospace">{model}</text>'
         )
 
-    arrows = [(130,165), (275,310), (420,455), (565,600), (710,745)]
+    # Arrows: x1=right_edge(source), x2=left_edge(target), gap=35px between nodes
+    arrows = [(125,160), (270,305), (415,460), (560,605), (705,750), (850,895), (995,1040)]
     p = [
         f'<svg viewBox="0 0 {W} {H}" xmlns="http://www.w3.org/2000/svg" '
         f'style="width:100%;background:#0a0a12;border-radius:10px;display:block">',
@@ -489,22 +499,26 @@ def _agent_graph_svg(statuses: dict = None, selected: str = None) -> str:
         '<marker id="ah"  markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#3a3a4a"/></marker>'
         '<marker id="ahl" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#5a5a2a"/></marker>'
         '<marker id="ahr" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#2a3a5a"/></marker>'
+        '<marker id="ahj" markerWidth="8" markerHeight="6" refX="8" refY="3" orient="auto"><polygon points="0 0,8 3,0 6" fill="#3a2a5a"/></marker>'
         '</defs>',
         # Main flow arrows
         *[f'<line x1="{x1}" y1="{CY}" x2="{x2}" y2="{CY}" stroke="#2e2e3e" stroke-width="1.5" marker-end="url(#ah)"/>'
           for x1, x2 in arrows],
         # intel→recon clarification (back arrow, above)
-        f'<path d="M 220,{CY-NH//2} C 220,18 75,18 75,{CY-NH//2}" fill="none" stroke="#4a4a2a" stroke-width="1.3" stroke-dasharray="5,3" marker-end="url(#ahl)"/>',
-        f'<text x="148" y="13" fill="#5a5a2a" font-size="8.5" font-family="monospace" text-anchor="middle">clarification?</text>',
+        f'<path d="M 220,{CY-NH//2} C 220,15 75,15 75,{CY-NH//2}" fill="none" stroke="#4a4a2a" stroke-width="1.3" stroke-dasharray="5,3" marker-end="url(#ahl)"/>',
+        f'<text x="148" y="11" fill="#5a5a2a" font-size="8" font-family="monospace" text-anchor="middle">clarification?</text>',
+        # knowledge_judge→threat_intel rejection (back arc, between nodes, above)
+        f'<path d="M 365,{CY-NH//2} C 365,40 220,40 220,{CY-NH//2}" fill="none" stroke="#3a2a5a" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#ahj)"/>',
+        f'<text x="292" y="35" fill="#3a2a5a" font-size="7.5" font-family="monospace" text-anchor="middle">rejected</text>',
         # validator→planner retry (back arrow, below)
-        f'<path d="M 800,{CY+NH//2} C 800,190 365,190 365,{CY+NH//2}" fill="none" stroke="#2a3a5a" stroke-width="1.3" stroke-dasharray="5,3" marker-end="url(#ahr)"/>',
-        f'<text x="585" y="205" fill="#2a3a5a" font-size="8.5" font-family="monospace" text-anchor="middle">retry on validation issues</text>',
+        f'<path d="M 945,{CY+NH//2} C 945,192 510,192 510,{CY+NH//2}" fill="none" stroke="#2a3a5a" stroke-width="1.3" stroke-dasharray="5,3" marker-end="url(#ahr)"/>',
+        f'<text x="727" y="207" fill="#2a3a5a" font-size="7.5" font-family="monospace" text-anchor="middle">retry on validation issues</text>',
         # intel→END (not demonstrable)
-        f'<line x1="220" y1="{CY+NH//2}" x2="220" y2="167" stroke="#2e2e3e" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#ah)"/>',
-        f'<text x="220" y="178" fill="#3a3a4a" font-size="8" font-family="monospace" text-anchor="middle">not demo</text>',
-        # validator→END
-        f'<line x1="856" y1="{CY}" x2="882" y2="{CY}" stroke="#2e2e3e" stroke-width="1.2" marker-end="url(#ah)"/>',
-        f'<text x="898" y="{CY+4}" fill="#3a3a4a" font-size="8" font-family="monospace">END</text>',
+        f'<line x1="220" y1="{CY+NH//2}" x2="220" y2="168" stroke="#2e2e3e" stroke-width="1.2" stroke-dasharray="4,3" marker-end="url(#ah)"/>',
+        f'<text x="220" y="180" fill="#3a3a4a" font-size="7.5" font-family="monospace" text-anchor="middle">not demo</text>',
+        # presentation→END
+        f'<line x1="1140" y1="{CY}" x2="1162" y2="{CY}" stroke="#2e2e3e" stroke-width="1.2" marker-end="url(#ah)"/>',
+        f'<text x="1175" y="{CY+4}" fill="#3a3a4a" font-size="8" font-family="monospace">END</text>',
         # Nodes
         *[node_svg(k, ic, nm, md, cx) for k, ic, nm, md, cx in _GRAPH_NODES],
         '</svg>',
@@ -582,6 +596,23 @@ def _agent_detail_panel(key: str, res: dict):
                 for a in pb.get("mandatory_agents", []):
                     st.markdown(f"&nbsp;&nbsp;`{a['agent_id']}` ({a['agent_type']})", unsafe_allow_html=True)
 
+        elif key == "knowledge_judge":
+            verdict = res.get("_knowledge_verdict", {})
+            if verdict:
+                score    = verdict.get("overall_score", "?")
+                approved = verdict.get("approved", True)
+                st.markdown(f"**Score:** {score}/100")
+                st.markdown(f"**Status:** {'✅ Approved' if approved else '⚠️ Rejected'}")
+                notes = verdict.get("judge_notes", "")
+                if notes: st.caption(notes[:200])
+                corrections = verdict.get("corrections", [])
+                if corrections:
+                    st.markdown(f"**Corrections ({len(corrections)}):**")
+                    for c in corrections[:4]:
+                        st.markdown(f"&nbsp;&nbsp;• `{c.get('field','?')}`: {c.get('reason','')[:70]}", unsafe_allow_html=True)
+            else:
+                st.caption("No verdict recorded")
+
         elif key == "validator":
             val = res.get("_validation", {})
             retries = res.get("_retry_count", 0)
@@ -591,6 +622,22 @@ def _agent_detail_panel(key: str, res: dict):
                 st.markdown(f"&nbsp;&nbsp;✗ {issue}", unsafe_allow_html=True)
             if val.get("feedback"):
                 st.caption(f"Feedback: {val['feedback'][:120]}")
+
+        elif key == "presentation":
+            pres = res.get("presentation", {})
+            if pres:
+                st.markdown(f"**{pres.get('headline', 'N/A')}**")
+                ksp = pres.get("key_selling_points", [])
+                if ksp:
+                    st.markdown(f"**{len(ksp)} selling points:**")
+                    for p in ksp[:3]:
+                        st.markdown(f"&nbsp;&nbsp;• {p[:90]}", unsafe_allow_html=True)
+                wow = pres.get("demo_wow_moments", [])
+                if wow:
+                    st.markdown(f"**{len(wow)} wow moments**")
+                st.caption(f"Duration: {pres.get('estimated_demo_duration', 'N/A')}")
+            else:
+                st.caption("Presentation not generated yet")
 
 
 def run_pipeline(pdf_bytes: bytes, model: str, platform: str, provider: str = "ollama") -> dict:
@@ -727,7 +774,7 @@ def run_pipeline(pdf_bytes: bytes, model: str, platform: str, provider: str = "o
 
 
 def run_graph_pipeline(pdf_bytes: bytes, platform: str, config_path: str = "config.yaml",
-                       agent_models: dict = None):
+                       agent_models: dict = None, generation_mode: str = "simulation"):
     """
     Multi-agent LangGraph pipeline.
     Yields the same (kind, step, msg) event format as run_pipeline() for
@@ -742,10 +789,12 @@ def run_graph_pipeline(pdf_bytes: bytes, platform: str, config_path: str = "conf
     _AGENT_INFO = {
         "recon":              (1, "🔍 Recon Agent",          "Extracting IOCs, TTPs, writing briefing"),
         "threat_intel":       (2, "🧠 Threat Intel Agent",   "Deep analysis — Claude Opus"),
-        "attack_planner":     (3, "⚔️ Attack Planner",       "Designing attack sequence — Claude Opus"),
-        "payload_crafter":    (4, "💻 Payload Crafter",      "Generating emulation snippets — Claude Sonnet"),
-        "playbook_assembler": (5, "📋 Playbook Assembler",   "Assembling Shadow-Replay JSON"),
-        "validator":          (6, "✅ Validator",             "Validating playbook"),
+        "knowledge_judge":    (3, "⚖️ Knowledge Judge",       "Validating analysis against domain knowledge"),
+        "attack_planner":     (4, "⚔️ Attack Planner",       "Designing attack sequence — Claude Opus"),
+        "payload_crafter":    (5, "💻 Payload Crafter",      "Generating emulation snippets — Claude Sonnet"),
+        "playbook_assembler": (6, "📋 Playbook Assembler",   "Assembling Shadow-Replay JSON"),
+        "validator":          (7, "✅ Validator",             "Validating playbook"),
+        "presentation":       (8, "🎤 Presentation Agent",   "Generating sales materials"),
     }
 
     with tempfile.NamedTemporaryFile(suffix=".pdf", delete=False) as tmp:
@@ -754,7 +803,8 @@ def run_graph_pipeline(pdf_bytes: bytes, platform: str, config_path: str = "conf
 
     try:
         graph = build_graph(config_path, agent_overrides=agent_models or {})
-        state = graph_initial_state(pdf_path=tmp_path, platform=platform)
+        state = graph_initial_state(pdf_path=tmp_path, platform=platform,
+                                    generation_mode=generation_mode)
     except Exception as e:
         yield "error", 0, f"Failed to build multi-agent graph: {e}"
         yield "final", {}
@@ -782,21 +832,24 @@ def run_graph_pipeline(pdf_bytes: bytes, platform: str, config_path: str = "conf
 
     # ── Normalize to the same results dict shape as run_pipeline() ──
     final_results = {
-        "content":         accumulated.get("content", {}),
-        "iocs":            accumulated.get("iocs", {}),
-        "ttps":            accumulated.get("ttps", []),
-        "analysis":        accumulated.get("analysis", {}),
-        "attack_sequence": accumulated.get("attack_sequence", []),
-        "snippets":        accumulated.get("snippets", []),
-        "playbook":        accumulated.get("playbook", {}),
-        "summary":         accumulated.get("narrative_summary", ""),
-        "demo_brief_md":   "",
-        "errors":          {},
-        # Multi-agent extras (used in Agent Log tab)
-        "_agent_messages": accumulated.get("messages", []),
-        "_validation":     accumulated.get("validation", {}),
-        "_retry_count":    max(0, accumulated.get("retry_count", 1) - 1),
-        "_pipeline":       "multi_agent",
+        "content":            accumulated.get("content", {}),
+        "iocs":               accumulated.get("iocs", {}),
+        "ttps":               accumulated.get("ttps", []),
+        "analysis":           accumulated.get("analysis", {}),
+        "attack_sequence":    accumulated.get("attack_sequence", []),
+        "snippets":           accumulated.get("snippets", []),
+        "replay_scripts":     accumulated.get("replay_scripts", []),
+        "playbook":           accumulated.get("playbook", {}),
+        "summary":            accumulated.get("narrative_summary", ""),
+        "demo_brief_md":      "",
+        "presentation":       accumulated.get("presentation", {}),
+        "errors":             {},
+        # Multi-agent extras
+        "_agent_messages":    accumulated.get("messages", []),
+        "_validation":        accumulated.get("validation", {}),
+        "_knowledge_verdict": accumulated.get("knowledge_verdict", {}),
+        "_retry_count":       max(0, accumulated.get("retry_count", 1) - 1),
+        "_pipeline":          "multi_agent",
     }
     yield "final", final_results
 
@@ -821,14 +874,35 @@ with st.sidebar:
         label_visibility="collapsed",
     )
 
+    # ── Run History ──────────────────────────────────────────────
+    _history_runs = list_runs()
+    if _history_runs:
+        with st.expander(f"🕓 Run History ({len(_history_runs)})", expanded=False):
+            for run in _history_runs[:10]:
+                p = run["preview"]
+                actor = p.get("threat_actor", "Unknown")[:22]
+                risk  = p.get("demo_risk", "")
+                risk_icon = {"high": "🔴", "medium": "🟡", "low": "🟢"}.get(risk, "⚪")
+                if st.button(
+                    f"{risk_icon} {actor}  ·  {run['saved_at'][:16]}",
+                    key=f"hist_{run['run_id']}",
+                    help=f"PDF: {run['pdf_name']}\nIOCs: {p.get('total_iocs',0)}  TTPs: {p.get('total_ttps',0)}",
+                    use_container_width=True,
+                ):
+                    loaded = load_run(run["run_id"])
+                    if loaded:
+                        st.session_state["results"] = loaded
+                        st.session_state["filename"] = run["pdf_name"]
+                        st.rerun()
+
     st.markdown("---")
     st.markdown("**Configuration**")
 
     # Provider selector
     _PROVIDER_MODELS = {
-        "ollama":    ["llama3", "llama3.1:70b", "llama3.2", "llama3.3:70b", "mixtral:8x7b", "mistral"],
-        "anthropic": ["claude-sonnet-4-6", "claude-opus-4-6", "claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"],
-        "openai":    ["gpt-4o", "gpt-4-turbo", "gpt-4"],
+        "ollama":    ["llama3", "llama3.1:70b", "llama3.2", "mixtral:8x7b", "mistral", "codellama"],
+        "anthropic": ["claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929"],
+        "openai":    ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4"],
     }
     _PROVIDER_LABELS = {
         "ollama":    "🖥️ Ollama (local)",
@@ -868,9 +942,21 @@ with st.sidebar:
             index=0,
         )
 
+    # Code generation mode (multi-agent only)
+    code_mode = "simulation"
+    if pipeline_mode == "multi_agent":
+        code_mode = st.radio(
+            "Code Generation",
+            ["simulation", "real_code"],
+            format_func=lambda x: "🛡️ Safe Simulation" if x == "simulation" else "⚡ Real Executable Code",
+            index=0,
+            help="Simulation: safe telemetry-generating code.  Real Code: actual executable techniques for the lab.",
+            horizontal=True,
+        )
+
     # ── Per-agent model configuration (multi-agent mode only) ────────
-    _ALL_CLAUDE = ["claude-sonnet-4-6", "claude-opus-4-6", "claude-sonnet-4-5-20250929", "claude-haiku-4-5-20251001"]
-    _ALL_GPT    = ["gpt-4o", "gpt-4-turbo", "gpt-4"]
+    _ALL_CLAUDE = ["claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929"]
+    _ALL_GPT    = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4"]
     _ALL_OLLAMA = ["llama3", "llama3.1:70b", "llama3.2", "mixtral:8x7b", "mistral", "codellama"]
     _AGENT_MODEL_OPTIONS = {
         "anthropic": _ALL_CLAUDE,
@@ -880,12 +966,14 @@ with st.sidebar:
     _PROVIDER_ICONS = {"anthropic": "🤖", "openai": "🟢", "ollama": "🖥️"}
     # (key, label, default_model, default_provider)
     _AGENT_SIDEBAR_DEFS = [
-        ("recon",              "🔍 Recon",       "claude-haiku-4-5-20251001",   "anthropic"),
-        ("threat_intel",       "🧠 Threat Intel", "claude-opus-4-6",             "anthropic"),
-        ("attack_planner",     "⚔️  Planner",     "claude-opus-4-6",             "anthropic"),
-        ("payload_crafter",    "💻 Crafter",      "claude-sonnet-4-6",           "anthropic"),
-        ("playbook_assembler", "📋 Assembler",    "claude-sonnet-4-6",           "anthropic"),
-        ("validator",          "✅ Validator",    "claude-sonnet-4-6",           "anthropic"),
+        ("recon",              "🔍 Recon",       "claude-haiku-4-5-20251001", "anthropic"),
+        ("threat_intel",       "🧠 Threat Intel", "claude-opus-4-6",          "anthropic"),
+        ("knowledge_judge",    "⚖️  Judge",        "claude-sonnet-4-6",        "anthropic"),
+        ("attack_planner",     "⚔️  Planner",      "claude-opus-4-6",          "anthropic"),
+        ("payload_crafter",    "💻 Crafter",      "claude-sonnet-4-6",        "anthropic"),
+        ("playbook_assembler", "📋 Assembler",    "claude-sonnet-4-6",        "anthropic"),
+        ("validator",          "✅ Validator",    "claude-sonnet-4-6",        "anthropic"),
+        ("presentation",       "🎤 Presenter",    "claude-sonnet-4-6",        "anthropic"),
     ]
     agent_models = {}
     if pipeline_mode == "multi_agent":
@@ -1017,13 +1105,15 @@ with st.sidebar:
     else:
         st.markdown("""
         <div style="font-size:0.75rem;color:#555;line-height:1.6">
-        <b style="color:#888">Multi-Agent pipeline:</b><br>
+        <b style="color:#888">Multi-Agent pipeline (8 agents):</b><br>
         🔍 Recon Agent <span style="color:#444">(Haiku)</span><br>
         🧠 Threat Intel Agent <span style="color:#444">(Opus)</span><br>
+        ⚖️ Knowledge Judge <span style="color:#444">(Sonnet)</span><br>
         ⚔️ Attack Planner <span style="color:#444">(Opus)</span><br>
         💻 Payload Crafter <span style="color:#444">(Sonnet)</span><br>
         📋 Playbook Assembler <span style="color:#444">(Sonnet)</span><br>
-        ✅ Validator + retry loop
+        ✅ Validator + retry loop<br>
+        🎤 Presentation Agent <span style="color:#444">(Sonnet)</span>
         </div>
         """, unsafe_allow_html=True)
 
@@ -1109,11 +1199,12 @@ if analyze_btn and uploaded_file:
         4: "LLM Analysis", 5: "Emulation Code", 6: "Playbook",
     }
     _agent_labels = {
-        1: "Recon Agent", 2: "Threat Intel", 3: "Attack Planner",
-        4: "Payload Crafter", 5: "Playbook Assembler", 6: "Validator",
+        1: "Recon Agent", 2: "Threat Intel", 3: "Knowledge Judge",
+        4: "Attack Planner", 5: "Payload Crafter", 6: "Playbook Assembler",
+        7: "Validator", 8: "Presentation",
     }
     step_labels = _agent_labels if pipeline_mode == "multi_agent" else _classic_labels
-    total_steps = 6
+    total_steps = 8 if pipeline_mode == "multi_agent" else 6
 
     logs = []
     final_results = None
@@ -1122,7 +1213,8 @@ if analyze_btn and uploaded_file:
         progress_bar = st.progress(0, text="Starting analysis...")
 
     pipeline_fn = (
-        lambda: run_graph_pipeline(pdf_bytes, platform, agent_models=agent_models)
+        lambda: run_graph_pipeline(pdf_bytes, platform, agent_models=agent_models,
+                                   generation_mode=code_mode)
         if pipeline_mode == "multi_agent"
         else run_pipeline(pdf_bytes, llm_model, platform, provider=llm_provider)
     )
@@ -1163,6 +1255,10 @@ if analyze_btn and uploaded_file:
         final_results["_pipeline"] = final_results.get("_pipeline", "classic")
         st.session_state["results"] = final_results
         st.session_state["filename"] = uploaded_file.name
+        try:
+            save_run(final_results, filename=uploaded_file.name)
+        except Exception:
+            pass  # Never block the UI on history save failure
         st.rerun()
 
 
@@ -1280,6 +1376,7 @@ if "results" in st.session_state:
         "📋 Playbook",
     ]
     if _is_multiagent:
+        _tab_names.append("🎤 Presentation")
         _tab_names.append("🤖 Agent Log")
     tabs = st.tabs(_tab_names)
 
@@ -1538,6 +1635,23 @@ if "results" in st.session_state:
     # TAB 5 — Emulation Code
     # ════════════════════════════════════════════════════════════
     with tabs[4]:
+        replay_scripts = res.get("replay_scripts", [])
+        if replay_scripts:
+            st.markdown(f"**{len(replay_scripts)} Replay Scripts** — third-party platform stages (email/cloud/SaaS)")
+            for rs in replay_scripts:
+                col_dl, col_info = st.columns([1, 3])
+                with col_dl:
+                    st.download_button(
+                        f"⬇️ {rs['filename']}",
+                        data=rs["content"],
+                        file_name=rs["filename"],
+                        mime="text/plain",
+                        key=f"dl_replay_{rs['stage']}",
+                    )
+                with col_info:
+                    st.caption(f"`{rs['technique_id']}` — {rs['description'][:80]}")
+            st.markdown("---")
+
         if not snippets:
             st.info("No emulation snippets generated (LLM may be unavailable).")
         else:
@@ -1688,10 +1802,91 @@ if "results" in st.session_state:
                 st.json(playbook)
 
     # ════════════════════════════════════════════════════════════
-    # TAB 7 — Agent Log (multi-agent mode only)
+    # TAB 7 — Presentation (multi-agent mode only)
     # ════════════════════════════════════════════════════════════
     if _is_multiagent:
         with tabs[6]:
+            pres = res.get("presentation", {})
+            if not pres:
+                st.info("Presentation materials not generated. Run the Multi-Agent pipeline to generate them.")
+            else:
+                headline = pres.get("headline", "")
+                if headline:
+                    st.markdown(f"## {headline}")
+                    st.markdown("")
+
+                col_brief, col_sales = st.columns([3, 2])
+
+                with col_brief:
+                    st.markdown('<div class="section-title">Executive Brief</div>', unsafe_allow_html=True)
+                    exec_md = pres.get("executive_brief_md", "")
+                    if exec_md:
+                        st.markdown(exec_md)
+                        st.markdown("")
+                        st.download_button(
+                            "⬇️ Download Executive Brief (.md)",
+                            data=exec_md,
+                            file_name="executive_brief.md",
+                            mime="text/markdown",
+                        )
+
+                with col_sales:
+                    # Key selling points
+                    ksp = pres.get("key_selling_points", [])
+                    if ksp:
+                        st.markdown('<div class="section-title">Key Selling Points</div>', unsafe_allow_html=True)
+                        for i, point in enumerate(ksp, 1):
+                            st.markdown(f"**{i}.** {point}")
+                        st.markdown("")
+
+                    # Discovery questions
+                    questions = pres.get("customer_discovery_questions", [])
+                    if questions:
+                        st.markdown('<div class="section-title">Discovery Questions</div>', unsafe_allow_html=True)
+                        for q in questions:
+                            st.markdown(f"• {q}")
+
+                # Wow moments
+                wow = pres.get("demo_wow_moments", [])
+                if wow:
+                    st.markdown('<div class="section-title" style="margin-top:1.5rem">Demo Wow Moments</div>', unsafe_allow_html=True)
+                    cols_wow = st.columns(min(len(wow), 3))
+                    for i, moment in enumerate(wow[:6]):
+                        with cols_wow[i % 3]:
+                            st.markdown(
+                                f'<div class="metric-card" style="text-align:left;padding:0.8rem">'
+                                f'<div style="font-size:0.7rem;color:#CC0000;font-weight:bold">'
+                                f'{moment.get("technique","")}</div>'
+                                f'<div style="font-size:0.82rem;color:#c0c0d0;margin-top:0.3rem">'
+                                f'{moment.get("wow","")[:120]}</div>'
+                                f'</div>',
+                                unsafe_allow_html=True,
+                            )
+
+                # ROI points + differentiators
+                col_roi, col_diff = st.columns(2)
+                with col_roi:
+                    roi = pres.get("roi_points", [])
+                    if roi:
+                        st.markdown('<div class="section-title" style="margin-top:1rem">ROI Arguments</div>', unsafe_allow_html=True)
+                        for r in roi:
+                            st.markdown(f"• {r}")
+                with col_diff:
+                    diff = pres.get("crowdstrike_differentiators", [])
+                    if diff:
+                        st.markdown('<div class="section-title" style="margin-top:1rem">CrowdStrike Differentiators</div>', unsafe_allow_html=True)
+                        for d in diff:
+                            st.markdown(f"• {d}")
+
+                duration = pres.get("estimated_demo_duration", "")
+                if duration:
+                    st.caption(f"Estimated demo duration: {duration}")
+
+    # ════════════════════════════════════════════════════════════
+    # TAB 8 — Agent Log (multi-agent mode only)
+    # ════════════════════════════════════════════════════════════
+    if _is_multiagent:
+        with tabs[7]:
             agent_messages = res.get("_agent_messages", [])
             validation     = res.get("_validation", {})
             retry_count    = res.get("_retry_count", 0)
@@ -1722,18 +1917,22 @@ if "results" in st.session_state:
             _AGENT_ICONS = {
                 "ReconAgent":              "🔍",
                 "ThreatIntelAgent":        "🧠",
+                "KnowledgeJudgeAgent":     "⚖️",
                 "AttackPlannerAgent":      "⚔️",
                 "PayloadCrafterAgent":     "💻",
                 "PlaybookAssemblerAgent":  "📋",
                 "ValidatorAgent":          "✅",
+                "PresentationAgent":       "🎤",
             }
             _AGENT_MODELS = {
                 "ReconAgent":              "Haiku",
                 "ThreatIntelAgent":        "Opus",
+                "KnowledgeJudgeAgent":     "Sonnet",
                 "AttackPlannerAgent":      "Opus",
                 "PayloadCrafterAgent":     "Sonnet",
                 "PlaybookAssemblerAgent":  "Sonnet",
                 "ValidatorAgent":          "Sonnet",
+                "PresentationAgent":       "Sonnet",
             }
 
             if not agent_messages:

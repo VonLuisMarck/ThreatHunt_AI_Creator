@@ -52,7 +52,6 @@ _PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 _PROMPTS_DIR  = os.path.join(_PROJECT_ROOT, "prompts")
 
 from langchain.prompts import PromptTemplate
-from langchain.chains import LLMChain
 
 
 # ── Context window por provider ───────────────────────────────────────────────
@@ -186,11 +185,8 @@ class LLMClient:
 
     def chain_run(self, template: str, input_variables: List[str], **kwargs) -> str:
         """
-        Ejecuta un LLMChain con PromptTemplate y devuelve el resultado como string.
-        Sustituye el patrón:
-            prompt = PromptTemplate(input_variables=[...], template=\"\"\"..\"\"\")
-            chain  = LLMChain(llm=self.llm, prompt=prompt)
-            result = chain.run(var1=..., var2=...)
+        Ejecuta prompt | llm (LCEL) con PromptTemplate y devuelve el resultado como string.
+        Compatible con Anthropic, OpenAI y Ollama via LangChain.
         """
         pt = PromptTemplate(input_variables=input_variables, template=template)
 
@@ -198,8 +194,9 @@ class LLMClient:
             rendered = pt.format(**kwargs)
             _log(self.agent_name, "CHAIN PROMPT", self.provider, self.model, rendered)
 
-        chain = LLMChain(llm=self._llm, prompt=pt)
-        result = chain.run(**kwargs)
+        chain    = pt | self._llm
+        response = chain.invoke(kwargs)
+        result   = response.content if hasattr(response, "content") else str(response)
 
         if _DEBUG:
             _log(self.agent_name, "CHAIN RESPONSE", self.provider, self.model, result)

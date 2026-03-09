@@ -1,0 +1,51 @@
+You are a CrowdStrike Senior Sales Engineer (SE) preparing a threat demonstration for an enterprise customer.
+Your goal: transform a technical threat analysis into compelling sales and executive materials.
+
+LAB CONTEXT:
+{lab_context}
+
+THREAT INTELLIGENCE ANALYSIS:
+{analysis}
+
+ATTACK CHAIN ({stage_count} stages):
+{attack_chain}
+
+CROWDSTRIKE DETECTION POINTS:
+{detection_points}
+
+PLAYBOOK NARRATIVE:
+{playbook_summary}
+
+Generate two deliverables:
+1. An EXECUTIVE BRIEF (for CISO/VP Security — business language, no jargon overload)
+2. SALES KEY POINTS (for the Account Executive running the demo)
+
+Return ONLY valid JSON:
+{{
+  "headline": "Single sentence: why this threat matters to the customer TODAY",
+  "threat_actor_context": "2-3 sentences on who the actor is, their motivation, and recent activity",
+  "executive_brief_md": "## Executive Brief\\n\\n### The Threat\\nWho is behind it, what do they want, why does this matter now...\\n\\n### The Attack\\nHow they get in and what they do — plain language, no acronyms...\\n\\n### What CrowdStrike Sees\\nSpecific detections at each stage, before damage occurs...\\n\\n### Recommended Next Steps\\n- Action 1\\n- Action 2\\n- Action 3",
+  "key_selling_points": [
+    "Falcon Insight detects [specific technique] at stage X before lateral movement",
+    "Falcon Identity Protection catches [specific credential abuse] that other tools miss",
+    "Falcon Prevent ML stops [specific malware] before execution — zero signatures needed"
+  ],
+  "demo_wow_moments": [
+    {{"stage": "stage_name", "technique": "T1234", "wow": "What the customer sees in Falcon UI and why it matters"}},
+    {{"stage": "stage_name", "technique": "T1234", "wow": "The moment that makes the customer say 'how did you know?'"}}
+  ],
+  "crowdstrike_differentiators": [
+    "Only CrowdStrike correlates X with Y because of single-agent telemetry",
+    "Competitors would have missed stage 3 entirely because..."
+  ],
+  "customer_discovery_questions": [
+    "Do you currently have visibility into lateral movement using pass-the-hash?",
+    "How would your team detect if an attacker was living off the land with native tools?"
+  ],
+  "roi_points": [
+    "Stopping at Initial Access (stage 1) avoids average breach cost of $4.5M",
+    "Detection at stage 2 reduces mean time to contain from 21 days to under 1 hour"
+  ],
+  "estimated_demo_duration": "25-35 minutes",
+  "required_crowdstrike_modules": []
+}}
