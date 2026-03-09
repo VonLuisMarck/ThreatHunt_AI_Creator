@@ -810,7 +810,7 @@ def run_graph_pipeline(pdf_bytes: bytes, platform: str, config_path: str = "conf
         yield "final", {}
         return
 
-    yield "step", 1, "Launching multi-agent pipeline (6 specialized agents)..."
+    yield "step", 1, "Launching multi-agent pipeline (8 specialized agents)..."
 
     accumulated = dict(state)
     last_step = 0
@@ -923,7 +923,7 @@ with st.sidebar:
         ["classic", "multi_agent"],
         format_func=lambda m: "⚙️  Classic (single model)" if m == "classic" else "🤖  Multi-Agent (specialized)",
         index=0,
-        help="Classic: single LLM, 6 steps.  Multi-Agent: 6 specialized agents with per-task models (requires Anthropic API).",
+        help="Classic: single LLM, 6 steps.  Multi-Agent: 8 specialized agents with per-task models.",
     )
 
     col1, col2 = st.columns(2)
