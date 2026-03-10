@@ -66,10 +66,29 @@ echo ""
 # ── 6a. Ollama ─────────────────────────────────────────────────────────────
 if command -v ollama &> /dev/null; then
     echo "  ✓ Ollama already installed"
-    echo "    Models: ollama pull llama3.1:8b  (fast)  |  ollama pull mixtral:8x7b  (quality)"
+    echo ""
+    echo "  Available models to download:"
+    echo "    1) llama3.1:8b       (Meta, USA — fast, low VRAM)"
+    echo "    2) llama3.3:70b      (Meta, USA — best overall)"
+    echo "    3) mistral:7b        (Mistral, France — good for code/analysis)"
+    echo "    4) phi4              (Microsoft, USA — fastest, lowest VRAM)"
+    echo "    5) gemma2:27b        (Google, USA — best narrative writing)"
+    echo "    6) Skip"
+    echo ""
+    read -r -p "  Select models to download (e.g. 1 3 5, or 6 to skip): " _MODEL_CHOICES
+    for _CHOICE in $_MODEL_CHOICES; do
+        case "$_CHOICE" in
+            1) ollama pull llama3.1:8b ;;
+            2) ollama pull llama3.3:70b ;;
+            3) ollama pull mistral:7b ;;
+            4) ollama pull phi4 ;;
+            5) ollama pull gemma2:27b ;;
+            6) break ;;
+        esac
+    done
 else
     echo "  ○ Ollama  → https://ollama.com/download"
-    echo "    After install: ollama pull llama3.1:8b"
+    echo "    After install: re-run this script to download models automatically."
 fi
 
 # ── 6c. vLLM ───────────────────────────────────────────────────────────────
