@@ -190,19 +190,52 @@ class LLMClient:
         self.context_limit = CONTEXT_LIMITS.get(provider, 4000)
         self._llm          = build_llm(provider, model, temperature)
 
+    # ── Auto-pull de modelo Ollama ────────────────────────────────────────────
+
+    def _ollama_pull_if_missing(self, exc: Exception) -> bool:
+        """
+        Si el provider es ollama y el error indica modelo no encontrado (404),
+        ejecuta `ollama pull <model>` y devuelve True para reintentar.
+        Devuelve False en cualquier otro caso.
+        """
+        if self.provider != "ollama":
+            return False
+        err = str(exc).lower()
+        if "404" not in err and "not found" not in err:
+            return False
+        import subprocess
+        print(f"\n[LLMClient] Modelo '{self.model}' no encontrado en Ollama. "
+              f"Descargando automáticamente...", flush=True)
+        result = subprocess.run(
+            ["ollama", "pull", self.model],
+            capture_output=False,   # muestra progreso en la terminal
+        )
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"No se pudo descargar el modelo '{self.model}' con Ollama. "
+                f"Ejecuta manualmente: ollama pull {self.model}"
+            )
+        print(f"[LLMClient] Modelo '{self.model}' descargado. Reintentando...", flush=True)
+        return True
+
     # ── Llamada directa ───────────────────────────────────────────────────────
 
     def invoke(self, prompt: str) -> str:
         """
         Envía un prompt completo al LLM y devuelve la respuesta como string.
-        Sustituye el patrón:
-            response = self.llm.invoke(prompt)
-            content  = response.content if hasattr(response, "content") else str(response)
+        Si Ollama devuelve 404 (modelo no descargado) hace pull automático y reintenta.
         """
         if _DEBUG:
             _log(self.agent_name, "PROMPT", self.provider, self.model, prompt)
 
-        response = self._llm.invoke(prompt)
+        for _attempt in range(2):
+            try:
+                response = self._llm.invoke(prompt)
+                break
+            except Exception as exc:
+                if _attempt == 0 and self._ollama_pull_if_missing(exc):
+                    continue
+                raise
         content = response.content if hasattr(response, "content") else str(response)
 
         if _DEBUG:
@@ -215,7 +248,7 @@ class LLMClient:
     def chain_run(self, template: str, input_variables: List[str], **kwargs) -> str:
         """
         Ejecuta prompt | llm (LCEL) con PromptTemplate y devuelve el resultado como string.
-        Compatible con Anthropic, OpenAI y Ollama via LangChain.
+        Si Ollama devuelve 404 (modelo no descargado) hace pull automático y reintenta.
         """
         pt = PromptTemplate(input_variables=input_variables, template=template)
 
@@ -223,9 +256,16 @@ class LLMClient:
             rendered = pt.format(**kwargs)
             _log(self.agent_name, "CHAIN PROMPT", self.provider, self.model, rendered)
 
-        chain    = pt | self._llm
-        response = chain.invoke(kwargs)
-        result   = response.content if hasattr(response, "content") else str(response)
+        chain = pt | self._llm
+        for _attempt in range(2):
+            try:
+                response = chain.invoke(kwargs)
+                break
+            except Exception as exc:
+                if _attempt == 0 and self._ollama_pull_if_missing(exc):
+                    continue
+                raise
+        result = response.content if hasattr(response, "content") else str(response)
 
         if _DEBUG:
             _log(self.agent_name, "CHAIN RESPONSE", self.provider, self.model, result)

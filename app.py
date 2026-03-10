@@ -727,7 +727,12 @@ def run_pipeline(pdf_bytes: bytes, model: str, platform: str, provider: str = "o
         results["playbook"] = {}
         results["summary"] = f"LLM error: {e}"
         results["demo_brief_md"] = ""
-        yield "error", 4, f"LLM error (is Ollama running?): {e}"
+        _llm_hint = ""
+        if "404" in str(e) or "not found" in str(e).lower():
+            _llm_hint = f" → Modelo no descargado. Ejecuta: ollama pull {model_name}"
+        elif "connection" in str(e).lower() or "refused" in str(e).lower():
+            _llm_hint = " → Ollama no está corriendo. Ejecuta: ollama serve"
+        yield "error", 4, f"LLM error: {e}{_llm_hint}"
         yield "final", results
         return
 
