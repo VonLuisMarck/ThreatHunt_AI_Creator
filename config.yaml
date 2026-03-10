@@ -34,62 +34,95 @@ llm:
 # MULTI-AGENT PIPELINE (main.py --graph)
 # Cada agente usa el modelo más adecuado para su tarea.
 # Si un agente no está configurado aquí, usa las claves de `llm` como fallback.
+#
+# ── CONFIGURACIÓN LOCAL 100% GRATUITA (LM Studio) ───────────────────────────
+# Para usar sin API keys, sustituye los bloques de cada agente por:
+#
+#   recon:          provider: lmstudio  model: phi-4
+#   threat_intel:   provider: lmstudio  model: llama-3.3-70b-instruct
+#   knowledge_judge:provider: lmstudio  model: mistral-large-instruct
+#   attack_planner: provider: lmstudio  model: llama-3.3-70b-instruct
+#   payload_crafter:provider: lmstudio  model: mistral-large-instruct
+#   playbook_assembler: provider: lmstudio  model: phi-4
+#   validator:      provider: lmstudio  model: mistral-large-instruct
+#   presentation:   provider: lmstudio  model: gemma-2-27b-it
+#
+# Razonamiento de la selección:
+#   phi-4            → tareas ligeras (briefing, ensamblado JSON, narrativa)
+#                      solo 14B parámetros, muy rápido, sorprendentemente capaz
+#   llama-3.3-70b    → tareas de máximo razonamiento (threat intel, planificación)
+#                      el mejor modelo open-source occidental para análisis complejo
+#   mistral-large    → tareas de validación y código (judge, crafter, validator)
+#                      arquitectura diseñada para razonamiento estructurado y código
+#   gemma-2-27b-it   → generación de texto narrativo (presentación ejecutiva)
+#                      muy bueno en redacción fluida con bajo consumo de VRAM
+#
+# NOTA: carga solo 1-2 modelos simultáneos en LM Studio para evitar OOM.
 # ─────────────────────────────────────────────────────────────────────────────
 agents:
   recon:
     # Extracción determinista (PDF/IOC/TTP) + redacción de briefing
-    # Haiku: rápido y barato — el trabajo pesado es regex, no LLM
+    # Haiku/phi-4: el trabajo pesado es regex — el LLM solo escribe el briefing
     provider: anthropic
     model: claude-haiku-4-5-20251001
     temperature: 0.1
+    # LOCAL: provider: lmstudio / model: phi-4
 
   threat_intel:
     # Análisis profundo: actor, campaña, demonstrability, CrowdStrike products
-    # Opus: máximo razonamiento y dominio de threat intelligence
+    # Opus/llama-3.3-70b: máximo razonamiento y dominio de threat intelligence
     provider: anthropic
     model: claude-opus-4-6
     temperature: 0.1
+    # LOCAL: provider: lmstudio / model: llama-3.3-70b-instruct
 
   attack_planner:
     # Diseño de la secuencia de ataque + incorporación de feedback del validator
-    # Opus: razonamiento estratégico, conocimiento del kill chain MITRE
+    # Opus/llama-3.3-70b: razonamiento estratégico, conocimiento del kill chain MITRE
     provider: anthropic
     model: claude-opus-4-6
     temperature: 0.1
+    # LOCAL: provider: lmstudio / model: llama-3.3-70b-instruct
 
   payload_crafter:
     # Generación de snippets de emulación (código seguro)
-    # Sonnet: buen balance calidad/coste para generación de código técnico
+    # Sonnet/mistral-large: fuerte en generación de código técnico estructurado
     provider: anthropic
     model: claude-sonnet-4-6
     temperature: 0.1
+    # LOCAL: provider: lmstudio / model: mistral-large-instruct
 
   playbook_assembler:
-    # El ensamblado JSON es determinista; Sonnet solo para la narrativa de demo
+    # El ensamblado JSON es determinista; LLM solo para la narrativa de demo
+    # Sonnet/phi-4: tarea ligera, phi-4 es suficiente y muy rápido
     provider: anthropic
     model: claude-sonnet-4-6
     temperature: 0.1
+    # LOCAL: provider: lmstudio / model: phi-4
 
   validator:
     # Validación lógica + feedback para retry loop
-    # Sonnet: suficiente para razonamiento de validación, más económico que Opus
+    # Sonnet/mistral-large: diseñado para razonamiento estructurado y validación
     provider: anthropic
     model: claude-sonnet-4-6
     temperature: 0.1
+    # LOCAL: provider: lmstudio / model: mistral-large-instruct
 
   knowledge_judge:
     # Valida el análisis de ThreatIntelAgent contra domain knowledge completo
-    # Sonnet: validación lógica y revisión de IOC/TTP accuracy
+    # Sonnet/mistral-large: validación lógica y revisión de IOC/TTP accuracy
     provider: anthropic
     model: claude-sonnet-4-6
     temperature: 0.1
+    # LOCAL: provider: lmstudio / model: mistral-large-instruct
 
   presentation:
     # Genera executive brief y key selling points de CrowdStrike
-    # Sonnet: creación de material de ventas, balance calidad/coste
+    # Sonnet/gemma-2-27b: buena redacción narrativa con bajo consumo de VRAM
     provider: anthropic
     model: claude-sonnet-4-6
     temperature: 0.2
+    # LOCAL: provider: lmstudio / model: gemma-2-27b-it
 
 output:
   playbook_dir: playbooks
