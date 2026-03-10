@@ -972,26 +972,86 @@ with st.sidebar:
         "ollama":    _ALL_OLLAMA,
     }
     _PROVIDER_ICONS = {"anthropic": "🤖", "openai": "🟢", "lmstudio": "🖥️", "vllm": "⚡", "ollama": "🐑"}
-    # (key, label, default_model, default_provider)
+
+    # Defaults óptimos por provider para cada agente.
+    # Al cambiar llm_provider los widgets usan claves distintas → se reinician solos.
+    _AGENT_DEFAULTS = {
+        "anthropic": {
+            "recon":              ("anthropic", "claude-haiku-4-5-20251001"),
+            "threat_intel":       ("anthropic", "claude-opus-4-6"),
+            "knowledge_judge":    ("anthropic", "claude-sonnet-4-6"),
+            "attack_planner":     ("anthropic", "claude-opus-4-6"),
+            "payload_crafter":    ("anthropic", "claude-sonnet-4-6"),
+            "playbook_assembler": ("anthropic", "claude-sonnet-4-6"),
+            "validator":          ("anthropic", "claude-sonnet-4-6"),
+            "presentation":       ("anthropic", "claude-sonnet-4-6"),
+        },
+        "openai": {
+            "recon":              ("openai", "gpt-4o-mini"),
+            "threat_intel":       ("openai", "gpt-4o"),
+            "knowledge_judge":    ("openai", "gpt-4o"),
+            "attack_planner":     ("openai", "gpt-4o"),
+            "payload_crafter":    ("openai", "gpt-4o"),
+            "playbook_assembler": ("openai", "gpt-4o-mini"),
+            "validator":          ("openai", "gpt-4o"),
+            "presentation":       ("openai", "gpt-4o-mini"),
+        },
+        "lmstudio": {
+            "recon":              ("lmstudio", "phi-4"),
+            "threat_intel":       ("lmstudio", "llama-3.3-70b-instruct"),
+            "knowledge_judge":    ("lmstudio", "mistral-large-instruct"),
+            "attack_planner":     ("lmstudio", "llama-3.3-70b-instruct"),
+            "payload_crafter":    ("lmstudio", "mistral-large-instruct"),
+            "playbook_assembler": ("lmstudio", "phi-4"),
+            "validator":          ("lmstudio", "mistral-large-instruct"),
+            "presentation":       ("lmstudio", "gemma-2-27b-it"),
+        },
+        "vllm": {
+            "recon":              ("vllm", "microsoft/phi-4"),
+            "threat_intel":       ("vllm", "meta-llama/Llama-3.3-70B-Instruct"),
+            "knowledge_judge":    ("vllm", "mistralai/Mixtral-8x7B-Instruct-v0.1"),
+            "attack_planner":     ("vllm", "meta-llama/Llama-3.3-70B-Instruct"),
+            "payload_crafter":    ("vllm", "mistralai/Mixtral-8x7B-Instruct-v0.1"),
+            "playbook_assembler": ("vllm", "microsoft/phi-4"),
+            "validator":          ("vllm", "mistralai/Mixtral-8x7B-Instruct-v0.1"),
+            "presentation":       ("vllm", "google/gemma-2-27b-it"),
+        },
+        "ollama": {
+            "recon":              ("ollama", "llama3.1:8b"),
+            "threat_intel":       ("ollama", "llama3.1:70b"),
+            "knowledge_judge":    ("ollama", "mixtral:8x7b"),
+            "attack_planner":     ("ollama", "llama3.1:70b"),
+            "payload_crafter":    ("ollama", "mixtral:8x7b"),
+            "playbook_assembler": ("ollama", "llama3.1:8b"),
+            "validator":          ("ollama", "mixtral:8x7b"),
+            "presentation":       ("ollama", "llama3.1:8b"),
+        },
+    }
+    # Fallback a anthropic si el provider no tiene tabla de defaults
+    _agent_defaults = _AGENT_DEFAULTS.get(llm_provider, _AGENT_DEFAULTS["anthropic"])
+
+    # (key, label)  — provider y model se leen de _agent_defaults
     _AGENT_SIDEBAR_DEFS = [
-        ("recon",              "🔍 Recon",       "claude-haiku-4-5-20251001", "anthropic"),
-        ("threat_intel",       "🧠 Threat Intel", "claude-opus-4-6",          "anthropic"),
-        ("knowledge_judge",    "⚖️  Judge",        "claude-sonnet-4-6",        "anthropic"),
-        ("attack_planner",     "⚔️  Planner",      "claude-opus-4-6",          "anthropic"),
-        ("payload_crafter",    "💻 Crafter",      "claude-sonnet-4-6",        "anthropic"),
-        ("playbook_assembler", "📋 Assembler",    "claude-sonnet-4-6",        "anthropic"),
-        ("validator",          "✅ Validator",    "claude-sonnet-4-6",        "anthropic"),
-        ("presentation",       "🎤 Presenter",    "claude-sonnet-4-6",        "anthropic"),
+        ("recon",              "🔍 Recon"),
+        ("threat_intel",       "🧠 Threat Intel"),
+        ("knowledge_judge",    "⚖️  Judge"),
+        ("attack_planner",     "⚔️  Planner"),
+        ("payload_crafter",    "💻 Crafter"),
+        ("playbook_assembler", "📋 Assembler"),
+        ("validator",          "✅ Validator"),
+        ("presentation",       "🎤 Presenter"),
     ]
     agent_models = {}
     if pipeline_mode == "multi_agent":
         with st.expander("🔧 Agent Models", expanded=False):
             st.markdown(
                 '<div style="font-size:0.7rem;color:#555;margin-bottom:0.6rem">'
-                'Provider → Model per agent. Ollama runs locally (no API key).</div>',
+                f'Defaults cargados para <b>{_PROVIDER_ICONS[llm_provider]} {llm_provider}</b>. '
+                'Cambia el provider principal arriba para recargar con los modelos óptimos.</div>',
                 unsafe_allow_html=True,
             )
-            for akey, alabel, adefault_model, adefault_prov in _AGENT_SIDEBAR_DEFS:
+            for akey, alabel in _AGENT_SIDEBAR_DEFS:
+                adefault_prov, adefault_model = _agent_defaults[akey]
                 st.markdown(f"**{alabel}**")
                 c_prov, c_model = st.columns([1, 2])
                 with c_prov:
@@ -1001,12 +1061,12 @@ with st.sidebar:
                         prov_opts,
                         index=prov_opts.index(adefault_prov),
                         format_func=lambda p: _PROVIDER_ICONS[p],
-                        key=f"ap_{akey}",
+                        # La clave incluye llm_provider → al cambiar provider se reinicia el widget
+                        key=f"ap_{akey}_{llm_provider}",
                         label_visibility="collapsed",
                     )
                 with c_model:
                     model_opts = _AGENT_MODEL_OPTIONS[sel_prov]
-                    # If default model is from a different provider, pick first
                     def_idx = model_opts.index(adefault_model) if (
                         sel_prov == adefault_prov and adefault_model in model_opts
                     ) else 0
@@ -1014,7 +1074,7 @@ with st.sidebar:
                         "Model",
                         model_opts,
                         index=def_idx,
-                        key=f"am_{akey}",
+                        key=f"am_{akey}_{llm_provider}",
                         label_visibility="collapsed",
                     )
                 agent_models[akey] = {"provider": sel_prov, "model": sel_model}
