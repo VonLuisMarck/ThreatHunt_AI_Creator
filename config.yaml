@@ -1,16 +1,34 @@
 llm:
   # Usado por el pipeline clásico (main.py sin --graph)
-  # Provider: ollama | anthropic | openai
-  # ollama    → local model, no cost, lower quality (good for dev)
-  # anthropic → Claude API, best quality (set ANTHROPIC_API_KEY in .env)
-  # openai    → GPT-4 API, good quality   (set OPENAI_API_KEY in .env)
+  #
+  # ── Providers disponibles ──────────────────────────────────────────────────
+  # anthropic → Claude API        (requiere ANTHROPIC_API_KEY en .env)
+  # openai    → OpenAI API        (requiere OPENAI_API_KEY en .env)
+  # ollama    → Ollama local      (sin coste, sin clave — instalar ollama.ai)
+  # lmstudio  → LM Studio local   (sin coste, sin clave — instalar lmstudio.ai)
+  #             Arrancar: LM Studio → pestaña Developer → Start Server (puerto 1234)
+  # vllm      → vLLM server       (sin coste, sin clave — pip install vllm)
+  #             Arrancar: vllm serve <modelo> --port 8000
+  #             URL personalizable con variable de entorno: VLLM_BASE_URL
+  #
+  # ── Modelos recomendados por provider ──────────────────────────────────────
+  # anthropic: claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5-20251001
+  # openai:    gpt-4o, gpt-4-turbo
+  # ollama:    llama3.1:8b (rápido), mixtral:8x7b (balance)
+  # lmstudio:  llama-3.3-70b-instruct   ← RECOMENDADO (Meta, USA)
+  #            mistral-large-instruct    ← muy bueno para análisis (Mistral, Francia)
+  #            phi-4                     ← muy eficiente en hardware limitado (Microsoft)
+  #            gemma-2-27b-it            ← buena calidad/tamaño (Google)
+  #            mixtral-8x7b-instruct-v0.1
+  # vllm:      meta-llama/Llama-3.3-70B-Instruct
+  #            mistralai/Mixtral-8x7B-Instruct-v0.1
+  #            microsoft/phi-4
+  #            google/gemma-2-27b-it
+  #
+  # PROHIBIDO: modelos de origen chino (DeepSeek, Qwen, Yi, Baichuan, etc.)
   provider: anthropic
   model: claude-sonnet-4-6
   temperature: 0.1
-  # Recommended models per provider:
-  #   ollama:    llama3.1:70b, mixtral:8x7b
-  #   anthropic: claude-sonnet-4-6, claude-opus-4-6, claude-haiku-4-5-20251001
-  #   openai:    gpt-4o, gpt-4-turbo
 
 # ─────────────────────────────────────────────────────────────────────────────
 # MULTI-AGENT PIPELINE (main.py --graph)

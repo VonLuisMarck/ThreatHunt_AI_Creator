@@ -37,9 +37,19 @@ Edita config.yaml → sección agents.<nombre_agente>:
     temperature: 0.1
 
 ── Providers soportados ─────────────────────────────────────────────────────
-  anthropic → Claude API  (ANTHROPIC_API_KEY)
-  openai    → OpenAI API  (OPENAI_API_KEY)
-  ollama    → Local LLM   (sin clave, modelo local)
+  anthropic → Claude API      (ANTHROPIC_API_KEY)
+  openai    → OpenAI API      (OPENAI_API_KEY)
+  ollama    → Ollama local    (sin clave, modelo local)
+  lmstudio  → LM Studio local (sin clave, API en localhost:1234)
+             Modelos recomendados: llama-3.3-70b-instruct, mistral-large-instruct,
+             phi-4, gemma-2-27b-it, mixtral-8x7b-instruct
+             → Descarga LM Studio: https://lmstudio.ai
+             → Activa "Local Server" en la pestaña Developer
+  vllm      → vLLM server     (sin clave, API en VLLM_BASE_URL o localhost:8000)
+             Modelos recomendados: meta-llama/Llama-3.3-70B-Instruct,
+             mistralai/Mixtral-8x7B-Instruct-v0.1, microsoft/phi-4
+             → pip install vllm
+             → vllm serve meta-llama/Llama-3.3-70B-Instruct --port 8000
 """
 
 import os
@@ -60,6 +70,14 @@ CONTEXT_LIMITS: dict = {
     "anthropic": 16000,   # Claude tiene 200k de contexto; usamos 16k por llamada
     "openai":    12000,   # GPT-4o tiene 128k
     "ollama":     4000,   # Modelos locales: default conservador
+    "lmstudio":  12000,   # LM Studio: depende del modelo cargado (70B suele tener 128k)
+    "vllm":      12000,   # vLLM: depende del modelo desplegado
+}
+
+# ── URLs por defecto para providers locales ───────────────────────────────────
+_LOCAL_BASE_URLS: dict = {
+    "lmstudio": "http://localhost:1234/v1",
+    "vllm":     os.environ.get("VLLM_BASE_URL", "http://localhost:8000/v1"),
 }
 
 # ── Debug flag ────────────────────────────────────────────────────────────────
@@ -98,6 +116,17 @@ def build_llm(provider: str, model_name: str, temperature: float = 0.1):
             model=model_name,
             temperature=temperature,
             openai_api_key=api_key,
+        )
+
+    if provider in ("lmstudio", "vllm"):
+        from langchain_openai import ChatOpenAI
+        base_url = _LOCAL_BASE_URLS[provider]
+        print(f"  [LLMClient] {provider.upper()} → {base_url}  model={model_name}")
+        return ChatOpenAI(
+            model=model_name,
+            temperature=temperature,
+            openai_api_key="lm-studio",   # valor requerido por la lib, no se envía
+            openai_api_base=base_url,
         )
 
     # Default: Ollama local
