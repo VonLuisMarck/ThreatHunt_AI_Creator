@@ -900,14 +900,18 @@ with st.sidebar:
 
     # Provider selector
     _PROVIDER_MODELS = {
-        "ollama":    ["llama3", "llama3.1:70b", "llama3.2", "mixtral:8x7b", "mistral", "codellama"],
         "anthropic": ["claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929"],
         "openai":    ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4"],
+        "lmstudio":  ["llama-3.3-70b-instruct", "mistral-large-instruct", "phi-4", "gemma-2-27b-it", "mixtral-8x7b-instruct-v0.1"],
+        "vllm":      ["meta-llama/Llama-3.3-70B-Instruct", "mistralai/Mixtral-8x7B-Instruct-v0.1", "microsoft/phi-4", "google/gemma-2-27b-it"],
+        "ollama":    ["llama3.1:8b", "llama3.1:70b", "mixtral:8x7b", "mistral", "llama3.2"],
     }
     _PROVIDER_LABELS = {
-        "ollama":    "🖥️ Ollama (local)",
         "anthropic": "🤖 Claude (Anthropic API)",
         "openai":    "🟢 OpenAI API",
+        "lmstudio":  "🖥️ LM Studio (local — recomendado)",
+        "vllm":      "⚡ vLLM (local — máximo rendimiento GPU)",
+        "ollama":    "🐑 Ollama (local — básico)",
     }
 
     llm_provider = st.selectbox(
@@ -955,15 +959,19 @@ with st.sidebar:
         )
 
     # ── Per-agent model configuration (multi-agent mode only) ────────
-    _ALL_CLAUDE = ["claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929"]
-    _ALL_GPT    = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4"]
-    _ALL_OLLAMA = ["llama3", "llama3.1:70b", "llama3.2", "mixtral:8x7b", "mistral", "codellama"]
+    _ALL_CLAUDE    = ["claude-sonnet-4-6", "claude-opus-4-6", "claude-haiku-4-5-20251001", "claude-sonnet-4-5-20250929"]
+    _ALL_GPT       = ["gpt-4o", "gpt-4o-mini", "gpt-4-turbo", "gpt-4"]
+    _ALL_LMSTUDIO  = ["llama-3.3-70b-instruct", "mistral-large-instruct", "phi-4", "gemma-2-27b-it", "mixtral-8x7b-instruct-v0.1"]
+    _ALL_VLLM      = ["meta-llama/Llama-3.3-70B-Instruct", "mistralai/Mixtral-8x7B-Instruct-v0.1", "microsoft/phi-4", "google/gemma-2-27b-it"]
+    _ALL_OLLAMA    = ["llama3.1:8b", "llama3.1:70b", "mixtral:8x7b", "mistral", "llama3.2"]
     _AGENT_MODEL_OPTIONS = {
         "anthropic": _ALL_CLAUDE,
         "openai":    _ALL_GPT,
+        "lmstudio":  _ALL_LMSTUDIO,
+        "vllm":      _ALL_VLLM,
         "ollama":    _ALL_OLLAMA,
     }
-    _PROVIDER_ICONS = {"anthropic": "🤖", "openai": "🟢", "ollama": "🖥️"}
+    _PROVIDER_ICONS = {"anthropic": "🤖", "openai": "🟢", "lmstudio": "🖥️", "vllm": "⚡", "ollama": "🐑"}
     # (key, label, default_model, default_provider)
     _AGENT_SIDEBAR_DEFS = [
         ("recon",              "🔍 Recon",       "claude-haiku-4-5-20251001", "anthropic"),
@@ -1084,7 +1092,14 @@ with st.sidebar:
                 st.caption("Required when using GPT models.")
 
         if "ollama" in _providers_in_use:
-            st.info("🖥️ Ollama: no key needed — run `ollama serve` locally", icon=None)
+            st.info("🐑 Ollama: no key needed — run `ollama serve` locally", icon=None)
+
+        if "lmstudio" in _providers_in_use:
+            st.info("🖥️ LM Studio: no key needed — open LM Studio → Developer → Start Server (port 1234)", icon=None)
+
+        if "vllm" in _providers_in_use:
+            _vllm_url = os.environ.get("VLLM_BASE_URL", "http://localhost:8000/v1")
+            st.info(f"⚡ vLLM: no key needed — server at {_vllm_url}  (set VLLM_BASE_URL to change)", icon=None)
 
     st.markdown("---")
     analyze_btn = st.button("🚀 Analyze Report", disabled=uploaded_file is None)
@@ -1119,9 +1134,11 @@ with st.sidebar:
 
     st.markdown("---")
     _req_line = {
-        "ollama": "Requires Ollama running locally",
         "anthropic": "Requires ANTHROPIC_API_KEY",
-        "openai": "Requires OPENAI_API_KEY",
+        "openai":    "Requires OPENAI_API_KEY",
+        "lmstudio":  "Requires LM Studio running with Local Server enabled (port 1234)",
+        "vllm":      "Requires vLLM server running (default port 8000)",
+        "ollama":    "Requires Ollama running locally",
     }
     st.markdown(f"""
     <div style="font-size:0.7rem;color:#444;text-align:center">

@@ -58,15 +58,29 @@ else
     echo "✓ MITRE ATT&CK data already present"
 fi
 
-# ── 6. Ollama (optional — local models) ───────────────────────────────────
+# ── 6. Local model providers (optional) ───────────────────────────────────
 echo ""
+echo "🖥️  Local model providers (optional — all free, no API key needed):"
+echo ""
+
 if command -v ollama &> /dev/null; then
-    echo "✓ Ollama already installed (local models available)"
+    echo "  ✓ Ollama already installed"
+    echo "    Models: ollama pull llama3.1:8b  (fast)  |  ollama pull mixtral:8x7b  (quality)"
 else
-    echo "ℹ️  Ollama not found — skipping local model setup."
-    echo "   Install it later from https://ollama.com/download if you want free local inference."
-    echo "   After install: ollama pull llama3.1:70b"
+    echo "  ○ Ollama  → https://ollama.com/download"
+    echo "    After install: ollama pull llama3.1:8b"
 fi
+echo ""
+echo "  ○ LM Studio (RECOMMENDED for local — best model variety + easy setup)"
+echo "    Download: https://lmstudio.ai"
+echo "    Setup: open app → Search → download llama-3.3-70b-instruct or mistral-large"
+echo "           then Developer tab → Start Server  (port 1234)"
+echo ""
+echo "  ○ vLLM  (maximum GPU throughput — requires Linux + NVIDIA GPU ≥ 40GB VRAM)"
+echo "    pip install vllm"
+echo "    vllm serve meta-llama/Llama-3.3-70B-Instruct --port 8000"
+echo ""
+echo "  NOTE: DeepSeek, Qwen, Yi and other Chinese-origin models are not supported."
 
 # ── 7. Sample report ──────────────────────────────────────────────────────
 SAMPLE_SCRIPT="tests/create_sample_report.py"
